@@ -19,7 +19,7 @@ const skyBox = loader.load([
 ]);
 
 const scene = new THREE.Scene();
-const objectLoader = new GLTFLoader();
+let objectarray = [];
 
 // debug ui
 const gui = new dat.GUI();
@@ -61,19 +61,25 @@ controls.target.set(0, 0, 0);
 controls.update();
 
 // scene lights
-const light = new THREE.DirectionalLight(0xffffff, 1);
-light.position.set(-1, 2, 4);
-scene.add(light);
+const light = new THREE.DirectionalLight(0xffffff, 1.3);
+light.position.set(-1, 15, 4);
+// scene.add(light);
 
+const ambientLight = new THREE.AmbientLight(0xffffff, 1)
+scene.add(ambientLight);
+
+const helper = new THREE.DirectionalLightHelper(light, 3, '0xffff00');
+scene.add(helper);
 // cube
 const cube = new THREE.BoxBufferGeometry();
 const cubeMat = new THREE.MeshStandardMaterial({
-  color: 0xee1111,
+  color: 0x000000,
   wireframe: false,
 });
 const cubeMesh = new THREE.Mesh(cube, cubeMat);
-cubeMesh.position.set(0, 0, -10);
-// scene.add(cubeMesh);
+cubeMesh.position.set(5, 0, -5);
+scene.add(cubeMesh);
+objectarray.push(cubeMesh);
 
 //Adding Controllers mesh in the scene.
 const controllerModelFactory = new XRControllerModelFactory();
@@ -87,7 +93,6 @@ controller1.addEventListener("selectstart", RightonSelectStart);
 
 //Raycast
 let raycaster = new THREE.Raycaster();
-let objectarray = [cubeMesh];
 
 //Right Controller Select Button
 function RightonSelectStart() {
@@ -97,16 +102,46 @@ function RightonSelectStart() {
     console.log(objectHit[0]);
   }
 }
-function Load() {
-  objectLoader.load("Models/scene.gltf", (Model) => {
-    console.log(Model);
-    scene.add(Model);
-  }, undefined, (Error) => {
-    console.log(Error);
-  });
 
-}
-Load();
+//Reticle
+let reticle = new THREE.Mesh(
+  new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2),
+  new THREE.MeshBasicMaterial({ color: 0xffffff })
+);
+
+reticle.matrixAutoUpdate = true;
+reticle.visible = false;
+scene.add(reticle);
+
+let mouse = new THREE.Vector2();
+window.addEventListener("mousemove", (event) => {
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+});
+
+window.addEventListener("click", () => {
+  if (reticle.visible) {
+    let currentLocation = camera.position;
+    let targetLocation = new THREE.Vector3(
+      reticle.position.x,
+      camera.position.y,
+      reticle.position.z
+    );
+
+    gsap.to(camera.position, 2, {
+      x: targetLocation.x,
+      y: currentLocation.y,
+      z: targetLocation.z,
+      onUpdate: () => {
+        camera.updateProjectionMatrix();
+      },
+    });
+
+    controls.target.set(targetLocation.x, currentLocation.y, targetLocation.z);
+
+    controls.update();
+  }
+});
 
 const animate = function () {
   // runs 60 times each seconds
@@ -114,9 +149,30 @@ const animate = function () {
 };
 
 function Update() {
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(objectarray);
+  if (intersects[0]) {
+    reticle.visible = true;
+    let location = intersects[0].point;
+    reticle.position.set(location.x, location.y + 0.01, location.z);
+  } else {
+    reticle.visible = false;
+  }
+
   // render the scene with our camera
   renderer.render(scene, camera);
 }
+const objectLoader = new GLTFLoader();
 
+function Load() {
+  objectLoader.load("/Models/scene.glb", (Model) => {
+    let temp = Model.scene;
+    scene.add(temp);
+    // objectarray.push(temp);
+  }, undefined, (Error) => {
+    console.log(Error);
+  });
+}
+Load();
 // start game loop
 animate();
