@@ -21,6 +21,9 @@ const skyBox = loader.load([
 const scene = new THREE.Scene();
 let objectarray = [];
 
+let tempMatrix = new THREE.Matrix4();
+let intersects //Variable for storing intersected Objects.
+
 // debug ui
 const gui = new dat.GUI();
 
@@ -35,6 +38,8 @@ camera.position.z = 5;
 
 const renderer = new THREE.WebGLRenderer({ alpha: true });
 renderer.shadowMap.enabled = true;
+
+//SkyBox Setup
 scene.background = skyBox;
 
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -61,23 +66,24 @@ controls.target.set(0, 0, 0);
 controls.update();
 
 // scene lights
-const light = new THREE.DirectionalLight(0xffffff, 1.3);
+const light = new THREE.DirectionalLight(0xffffff, 1);
 light.position.set(-1, 15, 4);
-// scene.add(light);
+scene.add(light);
 
-const ambientLight = new THREE.AmbientLight(0xffffff, 1)
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.5)
 scene.add(ambientLight);
 
 const helper = new THREE.DirectionalLightHelper(light, 3, '0xffff00');
 scene.add(helper);
+
 // cube
 const cube = new THREE.BoxBufferGeometry();
 const cubeMat = new THREE.MeshStandardMaterial({
-  color: 0x000000,
+  color: 0xffff00,
   wireframe: false,
 });
 const cubeMesh = new THREE.Mesh(cube, cubeMat);
-cubeMesh.position.set(5, 0, -5);
+cubeMesh.position.set(0, 0, -5);
 scene.add(cubeMesh);
 objectarray.push(cubeMesh);
 
@@ -90,89 +96,94 @@ controller2.add(controllerModelFactory.createControllerModel(controller2));
 scene.add(controller1, controller2);
 
 controller1.addEventListener("selectstart", RightonSelectStart);
+controller2.addEventListener("selectstart", LeftonSelectStart);
 
 //Raycast
 let raycaster = new THREE.Raycaster();
 
 //Right Controller Select Button
-function RightonSelectStart() {
-  raycaster.set(controller1.getWorldPosition(), new THREE.Vector3(0, 0, -1));
-  let objectHit = raycaster.intersectObjects(objectarray);
-  if (objectHit[0]) {
-    console.log(objectHit[0]);
+function RightonSelectStart(event) {
+  const intersect = getIntersection(event.target);
+  if (intersect) {
+    console.log(intersect.object.material.color.set(0xff0000));
   }
 }
 
-//Reticle
-let reticle = new THREE.Mesh(
-  new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2),
-  new THREE.MeshBasicMaterial({ color: 0xffffff })
-);
-
-reticle.matrixAutoUpdate = true;
-reticle.visible = false;
-scene.add(reticle);
-
-let mouse = new THREE.Vector2();
-window.addEventListener("mousemove", (event) => {
-  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-});
-
-window.addEventListener("click", () => {
-  if (reticle.visible) {
-    let currentLocation = camera.position;
-    let targetLocation = new THREE.Vector3(
-      reticle.position.x,
-      camera.position.y,
-      reticle.position.z
-    );
-
-    gsap.to(camera.position, 2, {
-      x: targetLocation.x,
-      y: currentLocation.y,
-      z: targetLocation.z,
-      onUpdate: () => {
-        camera.updateProjectionMatrix();
-      },
-    });
-
-    controls.target.set(targetLocation.x, currentLocation.y, targetLocation.z);
-
-    controls.update();
+//Left Controller Select Button
+function LeftonSelectStart(event) {
+  const intersect = getIntersection(event.target);
+  if (intersect) {
+    console.log(intersect.object.material.color.set(0xffff00));
   }
-});
+}
 
+//Line Mesh
+const geometry = new THREE.BufferGeometry().setFromPoints([
+  new THREE.Vector3(0, 0, 0),
+  new THREE.Vector3(0, 0, -1),
+]);
+
+const line = new THREE.Line(
+  geometry,
+  new THREE.LineBasicMaterial({ color: new THREE.Color(255, 0, 0) })
+);
+line.name = "line";
+line.scale.z = 5;
+
+//Adding Line to  Controller
+controller1.add(line.clone());
+controller2.add(line.clone());
+
+//Function Setting Ray position,Direction and Lines.
+function getIntersection(controller) {
+  tempMatrix.identity().extractRotation(controller.matrixWorld);
+
+  raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+  raycaster.ray.direction.applyMatrix4(tempMatrix);
+
+  const line = controller.getObjectByName("line");
+  const intersect = Raycast();
+
+  if (intersect) {
+    line.scale.z = intersect.distance;
+  }
+  else {
+    line.scale.z = 5;
+  }
+  return intersect;
+}
+
+//Raycast Function
+function Raycast() {
+  let objectIntersected = raycaster.intersectObjects(objectarray);
+  if (objectIntersected[0]) {
+    return objectIntersected[0];
+  }
+}
+
+//Loop Function.
 const animate = function () {
   // runs 60 times each seconds
   renderer.setAnimationLoop(Update);
 };
 
+//Update Function.
 function Update() {
-  raycaster.setFromCamera(mouse, camera);
-  const intersects = raycaster.intersectObjects(objectarray);
-  if (intersects[0]) {
-    reticle.visible = true;
-    let location = intersects[0].point;
-    reticle.position.set(location.x, location.y + 0.01, location.z);
-  } else {
-    reticle.visible = false;
-  }
-
   // render the scene with our camera
   renderer.render(scene, camera);
 }
 const objectLoader = new GLTFLoader();
 
-function Load() {
-  objectLoader.load("/Models/scene.glb", (Model) => {
+function Load(URL) {
+  objectLoader.load(URL, (Model) => {
     let temp = Model.scene;
     scene.add(temp);
-    // objectarray.push(temp);
+    objectarray.push(temp);
   }, undefined, (Error) => {
     console.log(Error);
   });
 }
-Load();
+Load("/Models/scene.glb");
+
 // start game loop
 animate();
