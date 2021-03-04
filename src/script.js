@@ -83,9 +83,17 @@ const cubeMat = new THREE.MeshStandardMaterial({
   wireframe: false,
 });
 const cubeMesh = new THREE.Mesh(cube, cubeMat);
-cubeMesh.position.set(0, 0, -5);
+cubeMesh.position.set(0, 0.5, 0);
 scene.add(cubeMesh);
 objectarray.push(cubeMesh);
+
+//Plane
+const planeGeometry = new THREE.PlaneGeometry(10, 10)
+const PlaneMesh = new THREE.Mesh(planeGeometry);
+scene.add(PlaneMesh);
+PlaneMesh.material.side = THREE.DoubleSide;
+PlaneMesh.rotation.x = (-Math.PI / 2);
+objectarray.push(PlaneMesh);
 
 //Adding Controllers mesh in the scene.
 const controllerModelFactory = new XRControllerModelFactory();
@@ -167,6 +175,10 @@ const animate = function () {
   renderer.setAnimationLoop(Update);
 };
 
+//Fog
+let fogColor = new THREE.Color(0xff0000);
+scene.fog = new THREE.Fog(fogColor, 0.0005, 20);
+
 //Update Function.
 function Update() {
   // render the scene with our camera
@@ -183,7 +195,6 @@ function Load(URL) {
     console.log(Error);
   });
 }
-Load("/Models/scene.glb");
 
 // start game loop
 animate();
