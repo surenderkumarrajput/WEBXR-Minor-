@@ -176,7 +176,7 @@ const animate = function () {
 };
 
 //Fog
-let fogColor = new THREE.Color(0xff0000);
+let fogColor = new THREE.Color(0x964B00);
 scene.fog = new THREE.Fog(fogColor, 0.0005, 20);
 
 //Update Function.
@@ -196,5 +196,6 @@ function Load(URL) {
   });
 }
 
+Load('Models/scene.glb')
 // start game loop
 animate();
