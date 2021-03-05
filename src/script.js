@@ -23,10 +23,13 @@ let objectarray = [];
 
 let tempMatrix = new THREE.Matrix4();
 let intersects //Variable for storing intersected Objects.
+const LoadingPercent = document.getElementById("LoadingPercent");
+const objectLoader = new GLTFLoader(); //Loader Initialising
 
 // debug ui
 const gui = new dat.GUI();
 
+//Camera
 const camera = new THREE.PerspectiveCamera(
   90,
   window.innerWidth / window.innerHeight,
@@ -34,20 +37,27 @@ const camera = new THREE.PerspectiveCamera(
   1000
 );
 
+//Renderer
+const renderer = new THREE.WebGLRenderer({ alpha: true });
+
 camera.position.z = 5;
 
-const renderer = new THREE.WebGLRenderer({ alpha: true });
 renderer.shadowMap.enabled = true;
 
 //SkyBox Setup
 scene.background = skyBox;
 
 renderer.setSize(window.innerWidth, window.innerHeight);
+
 //Enabling XR.
 renderer.xr.enabled = true;
 
-//VR Button
-document.body.appendChild(VRButton.createButton(renderer));
+//Loading VR Button after Model Loaded
+let AfterModelLoaded = new Event('Loaded', { bubbles: true });
+addEventListener('Loaded', () => {
+  document.body.appendChild(VRButton.createButton(renderer));
+  LoadingPercent.hidden = true;
+})
 
 // add to html page body
 document.body.appendChild(renderer.domElement);
@@ -82,18 +92,6 @@ const cubeMat = new THREE.MeshStandardMaterial({
   color: 0xffff00,
   wireframe: false,
 });
-const cubeMesh = new THREE.Mesh(cube, cubeMat);
-cubeMesh.position.set(0, 0.5, 0);
-scene.add(cubeMesh);
-objectarray.push(cubeMesh);
-
-//Plane
-const planeGeometry = new THREE.PlaneGeometry(10, 10)
-const PlaneMesh = new THREE.Mesh(planeGeometry);
-scene.add(PlaneMesh);
-PlaneMesh.material.side = THREE.DoubleSide;
-PlaneMesh.rotation.x = (-Math.PI / 2);
-objectarray.push(PlaneMesh);
 
 //Adding Controllers mesh in the scene.
 const controllerModelFactory = new XRControllerModelFactory();
@@ -184,18 +182,23 @@ function Update() {
   // render the scene with our camera
   renderer.render(scene, camera);
 }
-const objectLoader = new GLTFLoader();
 
-function Load(URL) {
+//Function for Loading Models
+function Load(URL, hasLoading) {
   objectLoader.load(URL, (Model) => {
     let temp = Model.scene;
     scene.add(temp);
     objectarray.push(temp);
-  }, undefined, (Error) => {
+    window.dispatchEvent(AfterModelLoaded);
+  }, (Loading) => {
+    if (hasLoading) {
+      LoadingPercent.textContent = parseInt((Loading.loaded / Loading.total) * 100) + '%';
+    }
+  }, (Error) => {
     console.log(Error);
   });
 }
+Load('Models/scene.glb', true);
 
-Load('Models/scene.glb')
 // start game loop
 animate();
