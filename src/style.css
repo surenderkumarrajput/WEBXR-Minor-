@@ -15,10 +15,10 @@ body {
   outline: none;
 }
 #LoadingPercent {
-  position: fixed;
+  position: absolute;
+  margin: 10px;
   color: white;
   width: 50%;
-  margin: 10px 10px 10px 10px;
   border: 2px solid white;
   border-radius: 20px;
   text-align: center;
