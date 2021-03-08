@@ -63,7 +63,8 @@ addEventListener('Loaded', () => {
 
   //Event Triggered on VR Entered
   VrButton.addEventListener('VREntered', () => {
-    renderer.xr.getCamera().getWorldPosition().set(1, 1, 1);
+    console.log('Entered VR');
+    positionalAudio.play();
   });
 })
 
@@ -222,7 +223,42 @@ function Load(URL, hasLoading) {
     console.log(Error);
   });
 }
+
+//Loading Main Model.
 Load('Models/scene.glb', true);
+
+//Audio
+let audioLoader = new THREE.AudioLoader();
+let audioListener = new THREE.AudioListener();
+let audio = new THREE.Audio(audioListener);
+let positionalAudio = new THREE.PositionalAudio(audioListener);
+
+//Adding Listener to camera
+camera.add(audioListener);
+
+//Normal Audio Loader
+function AudioLoader(path, volume) {
+  audioLoader.load(path, (buffer) => {
+    audio.setBuffer(buffer);
+    audio.setVolume(volume);
+  }, undefined, undefined);
+}
+
+//Positional Audio Loader
+function positionalAudioLoader(path, volume, RefDistance, PosX, PosY, Posz) {
+  audioLoader.load(path, (buffer) => {
+    positionalAudio.setBuffer(buffer);
+    positionalAudio.setVolume(volume);
+    positionalAudio.setRefDistance(RefDistance);
+    positionalAudio.setLoop(true);
+    positionalAudio.position.set(PosX, PosY, Posz);
+    scene.add(positionalAudio);
+  }, undefined, undefined);
+
+}
+
+//Loading Audio
+positionalAudioLoader("Audios/BG.wav", 0.1, 10, 2, 2, 2);
 
 // start game loop
 animate();
