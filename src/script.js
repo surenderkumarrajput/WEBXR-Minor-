@@ -113,6 +113,7 @@ const cubeMat = new THREE.MeshStandardMaterial({
 });
 let cubeMesh = new THREE.Mesh(cube, cubeMat);
 cubeMesh.name = 'cube';
+cubeMesh.scale.set(1, 1, 1);
 scene.add(cubeMesh);
 GameEventObjects.push(cubeMesh);
 
@@ -202,10 +203,10 @@ scene.fog = new THREE.Fog(fogColor, 0.0005, 20);
 //Function for Loading Models
 function Load(URL, hasLoading, name) {
   objectLoader.load(URL, (Model) => {
-    let temp = Model.scene;
-    temp.name = name;
-    scene.add(temp);
-    temp.traverse(function (child) {
+    let ModelMesh = Model.scene;
+    ModelMesh.name = name;
+    scene.add(ModelMesh);
+    ModelMesh.traverse(function (child) {
       if (child.isMesh) {
         objectarray.push(child);
       }
@@ -294,7 +295,6 @@ function Update() {
       }
     }
   }
-
   // render the scene with our camera
   renderer.render(scene, camera);
 }
