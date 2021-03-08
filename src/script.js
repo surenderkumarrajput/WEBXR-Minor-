@@ -21,10 +21,13 @@ const skyBox = loader.load([
 const scene = new THREE.Scene();
 let objectarray = [];
 
-let tempMatrix = new THREE.Matrix4();
-let intersects //Variable for storing intersected Objects.
+let raycastMatrix = new THREE.Matrix4();
+let GameEventObjMatrix = new THREE.Matrix4();
 const LoadingPercent = document.getElementById("LoadingPercent");
 const objectLoader = new GLTFLoader(); //Loader Initialising
+let inVR = false;
+
+let GameEventObjects = [];
 
 // debug ui
 const gui = new dat.GUI();
@@ -64,7 +67,7 @@ addEventListener('Loaded', () => {
   //Event Triggered on VR Entered
   VrButton.addEventListener('VREntered', () => {
     console.log('Entered VR');
-    positionalAudio.play();
+    inVR = true;
   });
 })
 
@@ -108,6 +111,10 @@ const cubeMat = new THREE.MeshStandardMaterial({
   color: 0xffff00,
   wireframe: false,
 });
+let cubeMesh = new THREE.Mesh(cube, cubeMat);
+cubeMesh.name = 'cube';
+scene.add(cubeMesh);
+GameEventObjects.push(cubeMesh);
 
 //Adding Controllers mesh in the scene.
 const controllerModelFactory = new XRControllerModelFactory();
@@ -160,10 +167,10 @@ controller2.add(line.clone());
 
 //Function Setting Ray position,Direction and Lines.
 function getIntersection(controller) {
-  tempMatrix.identity().extractRotation(controller.matrixWorld);
+  raycastMatrix.identity().extractRotation(controller.matrixWorld);
 
   raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
-  raycaster.ray.direction.applyMatrix4(tempMatrix);
+  raycaster.ray.direction.applyMatrix4(raycastMatrix);
 
   const line = controller.getObjectByName("line");
   const intersect = Raycast();
@@ -188,26 +195,15 @@ function Raycast() {
   }
 }
 
-//Loop Function.
-const animate = function () {
-  // runs 60 times each seconds
-  renderer.setAnimationLoop(Update);
-};
-
 //Fog
 let fogColor = new THREE.Color(0x964B00);
 scene.fog = new THREE.Fog(fogColor, 0.0005, 20);
 
-//Update Function.
-function Update() {
-  // render the scene with our camera
-  renderer.render(scene, camera);
-}
-
 //Function for Loading Models
-function Load(URL, hasLoading) {
+function Load(URL, hasLoading, name) {
   objectLoader.load(URL, (Model) => {
     let temp = Model.scene;
+    temp.name = name;
     scene.add(temp);
     temp.traverse(function (child) {
       if (child.isMesh) {
@@ -225,7 +221,7 @@ function Load(URL, hasLoading) {
 }
 
 //Loading Main Model.
-Load('Models/scene.glb', true);
+Load('Models/scene.glb', true, 'BaseModel');
 
 //Audio
 let audioLoader = new THREE.AudioLoader();
@@ -236,15 +232,15 @@ let positionalAudio = new THREE.PositionalAudio(audioListener);
 //Adding Listener to camera
 camera.add(audioListener);
 
-//Normal Audio Loader
-function AudioLoader(path, volume) {
+//Normal Audio Loader Function
+function NormalAudioLoader(path, volume) {
   audioLoader.load(path, (buffer) => {
     audio.setBuffer(buffer);
     audio.setVolume(volume);
   }, undefined, undefined);
 }
 
-//Positional Audio Loader
+//Positional Audio Loader Function
 function positionalAudioLoader(path, volume, RefDistance, PosX, PosY, Posz) {
   audioLoader.load(path, (buffer) => {
     positionalAudio.setBuffer(buffer);
@@ -254,11 +250,54 @@ function positionalAudioLoader(path, volume, RefDistance, PosX, PosY, Posz) {
     positionalAudio.position.set(PosX, PosY, Posz);
     scene.add(positionalAudio);
   }, undefined, undefined);
-
 }
 
 //Loading Audio
 positionalAudioLoader("Audios/BG.wav", 0.1, 10, 2, 2, 2);
+
+//Game Physics Implemetation
+let gameEventRaycast = new THREE.Raycaster();
+
+function gameEventObjIntersection() {
+  GameEventObjMatrix.extractRotation(camera.matrixWorld);
+  gameEventRaycast.ray.origin.setFromMatrixPosition(camera.matrixWorld);
+  gameEventRaycast.ray.direction.applyMatrix4(GameEventObjMatrix);
+  gameEventRaycast.far = 1;
+  let intersect = GameEventRaycast();
+  if (intersect) {
+    return intersect;
+  }
+}
+
+function GameEventRaycast() {
+  let intersectedObjects = gameEventRaycast.intersectObjects(GameEventObjects);
+  if (intersectedObjects[0]) {
+    return intersectedObjects[0];
+  }
+}
+
+//Loop Function.
+const animate = function () {
+  // runs 60 times each seconds
+  renderer.setAnimationLoop(Update);
+};
+
+//Update Function.
+function Update() {
+  if (inVR) {
+    let hit = gameEventObjIntersection();
+    if (hit) {
+      if (hit.object.name === 'cube') {
+        if (!positionalAudio.isPlaying) {
+          positionalAudio.play();
+        }
+      }
+    }
+  }
+
+  // render the scene with our camera
+  renderer.render(scene, camera);
+}
 
 // start game loop
 animate();
