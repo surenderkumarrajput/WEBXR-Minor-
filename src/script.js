@@ -113,6 +113,7 @@ const cubeMat = new THREE.MeshStandardMaterial({
 });
 let cubeMesh = new THREE.Mesh(cube, cubeMat);
 cubeMesh.name = 'cube';
+cubeMesh.userData = { done: false };
 cubeMesh.scale.set(1, 1, 1);
 scene.add(cubeMesh);
 GameEventObjects.push(cubeMesh);
@@ -242,13 +243,13 @@ function NormalAudioLoader(path, volume) {
 }
 
 //Positional Audio Loader Function
-function positionalAudioLoader(path, volume, RefDistance, PosX, PosY, Posz) {
+function positionalAudioLoader(path, volume, RefDistance, PosX, PosY, PosZ) {
   audioLoader.load(path, (buffer) => {
     positionalAudio.setBuffer(buffer);
     positionalAudio.setVolume(volume);
     positionalAudio.setRefDistance(RefDistance);
     positionalAudio.setLoop(true);
-    positionalAudio.position.set(PosX, PosY, Posz);
+    positionalAudio.position.set(PosX, PosY, PosZ);
     scene.add(positionalAudio);
   }, undefined, undefined);
 }
@@ -283,15 +284,23 @@ const animate = function () {
   renderer.setAnimationLoop(Update);
 };
 
+//Object Holding event functions of objects for game events
+let Properties = {
+  cube: function () {
+    if (!positionalAudio.isPlaying) {
+      positionalAudio.play();
+    }
+  }
+}
+
 //Update Function.
 function Update() {
   if (inVR) {
     let hit = gameEventObjIntersection();
     if (hit) {
-      if (hit.object.name === 'cube') {
-        if (!positionalAudio.isPlaying) {
-          positionalAudio.play();
-        }
+      if (hit.object.userData.done == false) {
+        Properties[hit.object.name]();
+        hit.object.userData.done = true;
       }
     }
   }
