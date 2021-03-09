@@ -126,20 +126,28 @@ controller2.addEventListener("selectstart", LeftonSelectStart);
 //Raycast
 let raycaster = new THREE.Raycaster();
 
-//Right Controller Select Button
-function RightonSelectStart(event) {
-  const intersect = getIntersection(event.target);
-  if (intersect) {
-
+let interactableProperties = {
+  cube: (intersectRef) => {
+    console.log('Interact');
+  },
+  Mesh_0: (intersectRef) => {
     //Smooth Teleporting to intersect Position
     gsap.to(camHolder.position, 2, {
-      x: intersect.point.x,
+      x: intersectRef.point.x,
       y: camHolder.position.y,
-      z: intersect.point.z,
+      z: intersectRef.point.z,
       onUpdate: () => {
         camera.updateProjectionMatrix();
       },
     })
+  }
+}
+
+//Right Controller Select Button
+function RightonSelectStart(event) {
+  const intersect = getIntersection(event.target);
+  if (intersect) {
+    interactableProperties[intersect.object.name](intersect);
   }
 }
 
@@ -148,16 +156,7 @@ function RightonSelectStart(event) {
 function LeftonSelectStart(event) {
   const intersect = getIntersection(event.target);
   if (intersect) {
-
-    //Smooth Teleporting to intersect Position
-    gsap.to(camHolder.position, 2, {
-      x: intersect.point.x,
-      y: camHolder.position.y,
-      z: intersect.point.z,
-      onUpdate: () => {
-        camera.updateProjectionMatrix();
-      },
-    })
+    interactableProperties[intersect.object.name](intersect);
   }
 }
 
