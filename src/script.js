@@ -43,6 +43,11 @@ const camera = new THREE.PerspectiveCamera(
 //Renderer
 const renderer = new THREE.WebGLRenderer({ alpha: true });
 
+//Camera Holder
+const camHolder = new THREE.Object3D();
+camHolder.add(camera);
+scene.add(camHolder);
+camHolder.position.set(-1, -0.5, 0);
 camera.position.z = 5;
 
 renderer.shadowMap.enabled = true;
@@ -88,22 +93,11 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 0, 0);
 controls.update();
 
-// scene lights
-const light = new THREE.DirectionalLight(0xffffff, 0.4);
-light.position.set(-1, 15, 4);
-scene.add(light);
-
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.01)
-scene.add(ambientLight);
-
-const pointLight = new THREE.PointLight(0xffffff, 1);
-pointLight.distance = 2;
-pointLight.position.set(1, 2, 1);
-camera.add(pointLight);
-scene.add(camera);
-
-const helper = new THREE.DirectionalLightHelper(light, 3, '0xffff00');
-scene.add(helper);
+// Torch light
+const TorchLight = new THREE.SpotLight(0xffffff, 0.5);
+TorchLight.position.set(0, 0, 1);
+TorchLight.target = (camera);
+camera.add(TorchLight);
 
 // cube
 const cube = new THREE.BoxBufferGeometry();
@@ -136,7 +130,16 @@ let raycaster = new THREE.Raycaster();
 function RightonSelectStart(event) {
   const intersect = getIntersection(event.target);
   if (intersect) {
-    console.log(intersect);
+
+    //Smooth Teleporting to intersect Position
+    gsap.to(camHolder.position, 2, {
+      x: intersect.point.x,
+      y: camHolder.position.y,
+      z: intersect.point.z,
+      onUpdate: () => {
+        camera.updateProjectionMatrix();
+      },
+    })
   }
 }
 
@@ -145,7 +148,16 @@ function RightonSelectStart(event) {
 function LeftonSelectStart(event) {
   const intersect = getIntersection(event.target);
   if (intersect) {
-    console.log(intersect);
+
+    //Smooth Teleporting to intersect Position
+    gsap.to(camHolder.position, 2, {
+      x: intersect.point.x,
+      y: camHolder.position.y,
+      z: intersect.point.z,
+      onUpdate: () => {
+        camera.updateProjectionMatrix();
+      },
+    })
   }
 }
 
@@ -191,9 +203,6 @@ function Raycast() {
   let objectIntersected = raycaster.intersectObjects(objectarray);
   if (objectIntersected[0]) {
     return objectIntersected[0];
-  }
-  else {
-    reticle.visible = false;
   }
 }
 
