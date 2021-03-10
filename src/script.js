@@ -7,6 +7,7 @@ import { VRButton } from "./VRButton.js";
 import { XRControllerModelFactory } from "three/examples/jsm/webxr/XRControllerModelFactory.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 import gsap from "gsap";
+import ThreeMeshUI from './three-mesh-ui-master/src/three-mesh-ui.js';
 
 const loader = new THREE.CubeTextureLoader();
 const skyBox = loader.load([
@@ -97,6 +98,7 @@ controls.update();
 const TorchLight = new THREE.SpotLight(0xffffff, 0.5);
 TorchLight.position.set(0, 0, 1);
 TorchLight.target = (camera);
+TorchLight.castShadow = true;
 camera.add(TorchLight);
 
 // cube
@@ -109,6 +111,7 @@ let cubeMesh = new THREE.Mesh(cube, cubeMat);
 cubeMesh.name = 'cube';
 cubeMesh.userData = { done: false };
 cubeMesh.scale.set(1, 1, 1);
+cubeMesh.receiveShadow = true;
 scene.add(cubeMesh);
 GameEventObjects.push(cubeMesh);
 
@@ -125,7 +128,7 @@ controller2.addEventListener("selectstart", LeftonSelectStart);
 
 //Raycast
 let raycaster = new THREE.Raycaster();
-
+let teleporting = false;
 let interactableProperties = {
   cube: (intersectRef) => {
     console.log('Interact');
@@ -136,8 +139,8 @@ let interactableProperties = {
       x: intersectRef.point.x,
       y: camHolder.position.y,
       z: intersectRef.point.z,
-      onUpdate: () => {
-        camera.updateProjectionMatrix();
+      onComplete: () => {
+        teleporting = false;
       },
     })
   }
@@ -146,16 +149,20 @@ let interactableProperties = {
 //Right Controller Select Button
 function RightonSelectStart(event) {
   const intersect = getIntersection(event.target);
-  if (intersect) {
-    interactableProperties[intersect.object.name](intersect);
-  }
+  SelectFunction(intersect);
 }
 
 
 //Left Controller Select Button
 function LeftonSelectStart(event) {
   const intersect = getIntersection(event.target);
-  if (intersect) {
+  SelectFunction(intersect);
+}
+
+//Function containing common calling logic for both controllers.
+function SelectFunction(intersect) {
+  if (intersect && !teleporting) {
+    teleporting = true;
     interactableProperties[intersect.object.name](intersect);
   }
 }
@@ -218,6 +225,7 @@ function Load(URL, hasLoading, name) {
     ModelMesh.traverse(function (child) {
       if (child.isMesh) {
         objectarray.push(child);
+        child.receiveShadow = true;
       }
     })
     window.dispatchEvent(AfterModelLoaded);
@@ -286,12 +294,6 @@ function GameEventRaycast() {
   }
 }
 
-//Loop Function.
-const animate = function () {
-  // runs 60 times each seconds
-  renderer.setAnimationLoop(Update);
-};
-
 //Object Holding event functions of objects for game events
 let Properties = {
   cube: function () {
@@ -301,8 +303,28 @@ let Properties = {
   }
 }
 
+//UI
+function CreateUI() {
+  const container = new ThreeMeshUI.Block({
+    height: 1.5,
+    width: 1,
+    backgroundOpacity: 0,
+  });
+  container.position.set(0, 0.6, 0.5)
+  container.rotation.x = -0.55;
+  cubeMesh.add(container);
+
+  const imageBlock = new ThreeMeshUI.Block({
+    height: 1,
+    width: 1,
+  });
+  container.add(imageBlock);
+}
+CreateUI();
+
 //Update Function.
 function Update() {
+  ThreeMeshUI.update();
   if (inVR) {
     let hit = gameEventObjIntersection();
     if (hit) {
@@ -315,6 +337,12 @@ function Update() {
   // render the scene with our camera
   renderer.render(scene, camera);
 }
+
+//Loop Function.
+const animate = function () {
+  // runs 60 times each seconds
+  renderer.setAnimationLoop(Update);
+};
 
 // start game loop
 animate();
