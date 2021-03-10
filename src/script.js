@@ -161,7 +161,7 @@ function LeftonSelectStart(event) {
 
 //Function containing common calling logic for both controllers.
 function SelectFunction(intersect) {
-  if (intersect && !teleporting) {
+  if (intersect && !teleporting && intersect.object.name in interactableProperties) {
     teleporting = true;
     interactableProperties[intersect.object.name](intersect);
   }
@@ -328,7 +328,7 @@ function Update() {
   if (inVR) {
     let hit = gameEventObjIntersection();
     if (hit) {
-      if (hit.object.userData.done == false) {
+      if (hit.object.userData.done == false && hit.object.name in Properties) {
         Properties[hit.object.name]();
         hit.object.userData.done = true;
       }
