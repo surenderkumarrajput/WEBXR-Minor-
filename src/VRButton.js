@@ -22,8 +22,7 @@ class VRButton {
 
 				currentSession = session;
 
-				const eventVR = new CustomEvent('VREntered', {
-				});
+				const eventVR = new CustomEvent('VREntered', {});
 				button.dispatchEvent(eventVR);
 			}
 

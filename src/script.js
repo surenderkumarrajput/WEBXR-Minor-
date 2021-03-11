@@ -135,7 +135,7 @@ let teleporting = false;
 
 let interactableProperties = {
   cube: (intersectRef) => {
-    Traverse(intersectRef).forEach(element => {
+    Traverse(intersectRef.object).forEach(element => {
       element.visible = false;
     })
   },
@@ -169,7 +169,7 @@ function LeftonSelectStart(event) {
 function SelectFunction(intersect) {
   if (intersect && !teleporting && intersect.object.name in interactableProperties) {
     teleporting = true;
-    interactableProperties[intersect.object.name](intersect.object);
+    interactableProperties[intersect.object.name](intersect);
   }
 }
 
@@ -305,7 +305,7 @@ let Properties = {
   cube: function (intersectRef) {
     if (!positionalAudio.isPlaying) {
       positionalAudio.play();
-      Traverse(intersectRef).forEach(element => {
+      Traverse(intersectRef.object).forEach(element => {
         element.visible = true;
       });
     }
@@ -355,7 +355,7 @@ function Update() {
     let hit = gameEventObjIntersection();
     if (hit) {
       if (hit.object.userData.done == false && hit.object.name in Properties) {
-        Properties[hit.object.name](hit.object);
+        Properties[hit.object.name](hit);
         hit.object.userData.done = true;
       }
     }
