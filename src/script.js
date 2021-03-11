@@ -111,9 +111,12 @@ let cubeMesh = new THREE.Mesh(cube, cubeMat);
 cubeMesh.name = 'cube';
 cubeMesh.userData = { done: false };
 cubeMesh.scale.set(1, 1, 1);
+cubeMesh.position.set(-1, 0, 0);
 cubeMesh.receiveShadow = true;
 scene.add(cubeMesh);
+objectarray.push(cubeMesh);
 GameEventObjects.push(cubeMesh);
+
 
 //Adding Controllers mesh in the scene.
 const controllerModelFactory = new XRControllerModelFactory();
@@ -129,9 +132,12 @@ controller2.addEventListener("selectstart", LeftonSelectStart);
 //Raycast
 let raycaster = new THREE.Raycaster();
 let teleporting = false;
+
 let interactableProperties = {
   cube: (intersectRef) => {
-    console.log('Interact');
+    Traverse(intersectRef).forEach(element => {
+      element.visible = false;
+    })
   },
   Mesh_0: (intersectRef) => {
     //Smooth Teleporting to intersect Position
@@ -163,7 +169,7 @@ function LeftonSelectStart(event) {
 function SelectFunction(intersect) {
   if (intersect && !teleporting && intersect.object.name in interactableProperties) {
     teleporting = true;
-    interactableProperties[intersect.object.name](intersect);
+    interactableProperties[intersect.object.name](intersect.object);
   }
 }
 
@@ -296,31 +302,51 @@ function GameEventRaycast() {
 
 //Object Holding event functions of objects for game events
 let Properties = {
-  cube: function () {
+  cube: function (intersectRef) {
     if (!positionalAudio.isPlaying) {
       positionalAudio.play();
+      Traverse(intersectRef).forEach(element => {
+        element.visible = true;
+      });
     }
   }
 }
 
 //UI
-function CreateUI() {
+function CreateInteractUIPanel(Parent) {
   const container = new ThreeMeshUI.Block({
     height: 1.5,
     width: 1,
     backgroundOpacity: 0,
+    fontFamily: 'Font/AkayaTelivigala-Regular-msdf.json',
+    fontTexture: 'Font/AkayaTelivigala-Regular.png'
   });
-  container.position.set(0, 0.6, 0.5)
+  container.position.set(0, 0.3, 0.7)
   container.rotation.x = -0.55;
-  cubeMesh.add(container);
+  Parent.add(container);
 
   const imageBlock = new ThreeMeshUI.Block({
-    height: 1,
-    width: 1,
+    height: 0.4,
+    width: 0.5,
+    alignContent: 'center', // could be 'center' or 'left'
+    justifyContent: 'center', // could be 'center' or 'start'
+    padding: 0.03
+  });
+  const text = new ThreeMeshUI.Text({
+    content: 'Press Select to Interact',
+    fontColor: new THREE.Color(0xffffff),
+    fontSize: 0.1
   });
   container.add(imageBlock);
+  imageBlock.add(text);
 }
-CreateUI();
+
+CreateInteractUIPanel(cubeMesh);
+
+//Setting UI to be not visible
+Traverse(cubeMesh).forEach(element => {
+  element.visible = false;
+});
 
 //Update Function.
 function Update() {
@@ -329,13 +355,25 @@ function Update() {
     let hit = gameEventObjIntersection();
     if (hit) {
       if (hit.object.userData.done == false && hit.object.name in Properties) {
-        Properties[hit.object.name]();
+        Properties[hit.object.name](hit.object);
         hit.object.userData.done = true;
       }
     }
   }
   // render the scene with our camera
   renderer.render(scene, camera);
+}
+
+
+//Custom function created for traversing child of an object.
+function Traverse(object) {
+  let childArr = [];
+  object.traverse((child) => {
+    if (child.isBlock) {
+      childArr.push(child);
+    }
+  })
+  return childArr;
 }
 
 //Loop Function.
