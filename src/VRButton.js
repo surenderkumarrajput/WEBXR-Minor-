@@ -34,6 +34,9 @@ class VRButton {
 
 				currentSession = null;
 
+				const eventVREnd = new CustomEvent('VREnd', {});
+				button.dispatchEvent(eventVREnd);
+
 			}
 
 			//

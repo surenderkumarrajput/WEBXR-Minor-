@@ -1,14 +1,33 @@
-import "./style.css";
-
-import * as THREE from "three";
+import './style.css'
+import * as THREE from "three/build/three.module.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import * as dat from "dat.gui";
 import { VRButton } from "./VRButton.js";
 import { XRControllerModelFactory } from "three/examples/jsm/webxr/XRControllerModelFactory.js";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
-import gsap from "gsap";
+import { Object3D } from 'three';
 import ThreeMeshUI from './three-mesh-ui-master/src/three-mesh-ui.js';
 
+//Array of objects which ray can hit.
+let objectarray = [];
+
+//Array of loaded audio buffers
+let loadedAudioBuffers = [];
+
+//Audio References
+let audioRefLinks =
+  [
+    'Audios/audio/505/hh.ogg',
+    'Audios/audio/505/hho.ogg',
+    'Audios/audio/505/kick.ogg',
+    'Audios/audio/505/snare.ogg',
+    'Audios/audio/jazz/clave.wav'
+  ];
+
+//Color Array
+let colors = ['0xffff00', '0x00ffff', '0xffffff', '0xff0000', '0x40ff00'];
+
+//SkyBox
 const loader = new THREE.CubeTextureLoader();
 const skyBox = loader.load([
   "/SkyBox/Right.png",  //px
@@ -19,315 +38,274 @@ const skyBox = loader.load([
   "/SkyBox/Back.png",   //nz
 ]);
 
+//Array of Playable Objects
+let playableObjects = [];
+
+//Scene Setup
+const camHolder = new Object3D();
 const scene = new THREE.Scene();
-let objectarray = [];
-
-let raycastMatrix = new THREE.Matrix4();
-let GameEventObjMatrix = new THREE.Matrix4();
-const LoadingPercent = document.getElementById("LoadingPercent");
-const objectLoader = new GLTFLoader(); //Loader Initialising
-let inVR = false;
-
-let GameEventObjects = [];
-
-// debug ui
-const gui = new dat.GUI();
-
-//Camera
-const camera = new THREE.PerspectiveCamera(
-  90,
-  window.innerWidth / window.innerHeight,
-  0.01,
-  1000
-);
-
-//Renderer
+const camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.01, 1000);
 const renderer = new THREE.WebGLRenderer({ alpha: true });
 
-//Camera Holder
-const camHolder = new THREE.Object3D();
-camHolder.add(camera);
 scene.add(camHolder);
-camHolder.position.set(-1, -0.5, 0);
-camera.position.z = 5;
+camHolder.add(camera);
 
-renderer.shadowMap.enabled = true;
-
-//SkyBox Setup
 scene.background = skyBox;
 
 renderer.setSize(window.innerWidth, window.innerHeight);
 
-//Enabling XR.
-renderer.xr.enabled = true;
-
-//Loading VR Button after Model Loaded
-let AfterModelLoaded = new Event('Loaded', { bubbles: true });
-
-//Event Triggered after Models are loaded.
-addEventListener('Loaded', () => {
-  let VrButton;
-  document.body.appendChild(VrButton = VRButton.createButton(renderer));
-  LoadingPercent.hidden = true;
-
-  //Event Triggered on VR Entered
-  VrButton.addEventListener('VREntered', () => {
-    console.log('Entered VR');
-    inVR = true;
-  });
-})
-
-// add to html page body
+//Add to HTML Page.
 document.body.appendChild(renderer.domElement);
 
-// handle resize of browser
+//Creating VR Button.
+let VrButton;
+document.body.appendChild(VrButton = VRButton.createButton(renderer));
+renderer.xr.enabled = true;
+
+//Event Triggered on VR Entered
+VrButton.addEventListener('VREntered', () => {
+  //Setting Camera Position
+  camHolder.position.z = 5;
+});
+
+VrButton.addEventListener('VREnd', () => {
+  //Setting Camera Position
+  camHolder.position.z = 5;
+});
+
+//Setting Camera Position
+camHolder.position.z = 5;
+
+//Resize Event
 window.addEventListener("resize", function () {
-  let aspectRatio = window.innerWidth / window.innerHeight;
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  var aspectRatio = window.innerWidth / window.innerHeight;
   camera.aspect = aspectRatio;
+  renderer.setSize(window.innerWidth, window.innerHeight);
   camera.updateProjectionMatrix();
 });
 
-
-// controls
+//Orbital Controls
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 0, 0);
 controls.update();
 
-// Torch light
-const TorchLight = new THREE.SpotLight(0xffffff, 0.5);
-TorchLight.position.set(0, 0, 1);
-TorchLight.target = (camera);
-TorchLight.castShadow = true;
-camera.add(TorchLight);
+//Fog
+let color = new THREE.Color("#88DAE4");
+let near = 0.1;
+let far = 1500;
+const fog = new THREE.Fog(color, near, far);
+scene.fog = fog;
 
-// cube
-const cube = new THREE.BoxBufferGeometry();
-const cubeMat = new THREE.MeshStandardMaterial({
-  color: 0xffff00,
-  wireframe: false,
-});
-let cubeMesh = new THREE.Mesh(cube, cubeMat);
-cubeMesh.name = 'cube';
-cubeMesh.userData = { done: false };
-cubeMesh.scale.set(1, 1, 1);
-cubeMesh.position.set(-1, 0, 0);
-cubeMesh.receiveShadow = true;
-scene.add(cubeMesh);
-objectarray.push(cubeMesh);
-GameEventObjects.push(cubeMesh);
+//Lightning
+var ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+scene.add(ambientLight);
+var pointLight = new THREE.PointLight(0xffffff, 1);
+pointLight.position.set(25, 50, 25);
+scene.add(pointLight);
 
+//Grid
+const grid = new THREE.Object3D();
 
-//Adding Controllers mesh in the scene.
-const controllerModelFactory = new XRControllerModelFactory();
-const controller1 = renderer.xr.getController(0);
-controller1.add(controllerModelFactory.createControllerModel(controller1));
-const controller2 = renderer.xr.getController(1);
-controller2.add(controllerModelFactory.createControllerModel(controller2));
-scene.add(controller1, controller2);
+let spacing = 1.3;
+let iCount = 4;
+let jCount = 4;
 
-controller1.addEventListener("selectstart", RightonSelectStart);
-controller2.addEventListener("selectstart", LeftonSelectStart);
+const cube = new THREE.BoxGeometry();
 
-//Raycast
-let raycaster = new THREE.Raycaster();
-let teleporting = false;
-
-let interactableProperties = {
-  cube: (intersectRef) => {
-    Traverse(intersectRef.object).forEach(element => {
-      element.visible = false;
-    })
-  },
-  Mesh_0: (intersectRef) => {
-    //Smooth Teleporting to intersect Position
-    gsap.to(camHolder.position, 2, {
-      x: intersectRef.point.x,
-      y: camHolder.position.y,
-      z: intersectRef.point.z,
-      onComplete: () => {
-        teleporting = false;
-      },
-    })
+for (let i = 0; i < iCount; i++) {
+  for (let j = jCount - 1; j >= 0; j--) {
+    const cube_mat = new THREE.MeshStandardMaterial({ color: 0x000000 });
+    const cube_mesh = new THREE.Mesh(cube, cube_mat);
+    cube_mesh.position.x = (i - iCount / 2) * spacing;
+    cube_mesh.position.y = (j - jCount / 2) * spacing;
+    grid.add(cube_mesh);
+    objectarray.push(cube_mesh);
+    cube_mesh.userData = { 'index': 0, 'ArrayIndex': objectarray.indexOf(cube_mesh) };
   }
 }
+scene.add(grid);
 
-//Right Controller Select Button
-function RightonSelectStart(event) {
-  const intersect = getIntersection(event.target);
-  SelectFunction(intersect);
-}
-
-
-//Left Controller Select Button
-function LeftonSelectStart(event) {
-  const intersect = getIntersection(event.target);
-  SelectFunction(intersect);
-}
-
-//Function containing common calling logic for both controllers.
-function SelectFunction(intersect) {
-  if (intersect && !teleporting && intersect.object.name in interactableProperties) {
-    teleporting = true;
-    interactableProperties[intersect.object.name](intersect);
-  }
-}
-
-//Line Mesh
-const geometry = new THREE.BufferGeometry().setFromPoints([
-  new THREE.Vector3(0, 0, 0),
-  new THREE.Vector3(0, 0, -1),
-]);
-
-const line = new THREE.Line(
-  geometry,
-  new THREE.LineBasicMaterial({ color: new THREE.Color(255, 0, 0) })
-);
-line.name = "line";
-line.scale.z = 5;
-
-
-//Adding Line to  Controller
-controller1.add(line.clone());
-controller2.add(line.clone());
-
-//Function Setting Ray position,Direction and Lines.
-function getIntersection(controller) {
-  raycastMatrix.identity().extractRotation(controller.matrixWorld);
-
-  raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
-  raycaster.ray.direction.applyMatrix4(raycastMatrix);
-
-  const line = controller.getObjectByName("line");
-  const intersect = Raycast();
-
-  if (intersect) {
-    line.scale.z = intersect.distance;
-  }
-  else {
-    line.scale.z = 5;
-  }
-  return intersect;
-}
+//Cube for traversing helper
+const cube_mat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+const cube_mesh = new THREE.Mesh(cube, cube_mat);
+cube_mesh.scale.set(0.5, 0.5, 0.5);
+scene.add(cube_mesh);
 
 //Raycast Function
+let raycaster = new THREE.Raycaster();
+
+//Variable for storing position of click or tap
+let mouse = new THREE.Vector2();
+window.addEventListener('click', (event) => {
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  let intersect = Raycast();
+  if (intersect) {
+    intersect.object.material.color.setHex(colors[intersect.object.userData.index]);
+    intersect.object.userData.index = (intersect.object.userData.index + 1) % (colors.length);
+    console.log(intersect.object.userData.index);
+
+    //Don not add object in playable array if already present
+    if (!playableObjects.includes(intersect.object)) {
+      playableObjects.push(intersect.object);
+    }
+  }
+})
+
+//Audio
+let audioListener = new THREE.AudioListener();
+let audio = new THREE.Audio(audioListener);
+let audioLoader = new THREE.AudioLoader();
+camera.add(audioListener);
+
+//Mapper for mapping audio with colors.
+let mapper = {
+  '0xffff00': () => {
+    setAudio(loadedAudioBuffers[1], 1)
+  },
+  '0x00ffff': () => {
+    setAudio(loadedAudioBuffers[2], 1)
+  },
+  '0xffffff': () => {
+    setAudio(loadedAudioBuffers[3], 1)
+  },
+  '0xff0000': () => {
+    setAudio(loadedAudioBuffers[4], 1)
+  },
+  '0x40ff00': () => {
+    setAudio(loadedAudioBuffers[0], 1)
+  }
+}
+
+//Normal Audio Loader Function
+function NormalAudioLoader() {
+  for (let index = 0; index < audioRefLinks.length; index++) {
+    audioLoader.load(audioRefLinks[index], (buffer) => {
+      loadedAudioBuffers.push(buffer);
+    }, undefined, undefined);
+  }
+}
+
+//Audio Set function
+function setAudio(Buffer, Volume) {
+  if (audio.buffer != null) {
+    audio.buffer = null;
+  }
+  audio.setBuffer(Buffer);
+  audio.setVolume(Volume);
+  if (audio.isPlaying) {
+    audio.stop();
+    audio.play();
+  }
+  else {
+    audio.play();
+  }
+}
+
+//Raycast returning hit object
 function Raycast() {
+  raycaster.setFromCamera(mouse, camera);
   let objectIntersected = raycaster.intersectObjects(objectarray);
   if (objectIntersected[0]) {
     return objectIntersected[0];
   }
 }
 
-//Fog
-let fogColor = new THREE.Color(0x964B00);
-scene.fog = new THREE.Fog(fogColor, 0.0005, 20);
+//Function for Traversing audios or play audios
+let index = 0;
+let stopbool = false;
+const StopButton = document.getElementById('Stop');
+const PauseButton = document.getElementById('Pause');
+const PlayButton = document.getElementById('Play');
 
-//Function for Loading Models
-function Load(URL, hasLoading, name) {
-  objectLoader.load(URL, (Model) => {
-    let ModelMesh = Model.scene;
-    ModelMesh.name = name;
-    scene.add(ModelMesh);
-    ModelMesh.traverse(function (child) {
-      if (child.isMesh) {
-        objectarray.push(child);
-        child.receiveShadow = true;
+function PlayAudio() {
+  if (!stopbool && playableObjects.length > 0) {
+    alreadyPlaying = true;
+    cube_mesh.visible = true;
+    setTimeout(function () {
+      if (playableObjects[index]) {
+        if (colors[playableObjects[index].userData.index] in mapper) {
+          mapper[colors[playableObjects[index].userData.index]]();
+
+          console.log(colors[playableObjects[index].userData.index]);
+          cube_mesh.position.set(playableObjects[index].position.x, playableObjects[index].position.y, playableObjects[index].position.z + 1);
+        }
       }
-    })
-    window.dispatchEvent(AfterModelLoaded);
-  }, (Loading) => {
-    if (hasLoading) {
-      LoadingPercent.textContent = parseInt((Loading.loaded / Loading.total) * 100) + '%';
-    }
-  }, (Error) => {
-    console.log(Error);
+      if (index < playableObjects.length) {
+        index++;
+        PlayAudio();
+      }
+      else {
+        index = 0;
+        PlayAudio();
+      }
+    }, 200)
+  }
+}
+
+let alreadyPlaying = false;//If already is playing or not.
+
+StopButton.addEventListener('click', () => {
+  stopbool = true;
+  cube_mesh.visible = false;
+  alreadyPlaying = false;
+  playableObjects = [];
+  index = 0;
+  objectarray.forEach(element => {
+    element.material.color.setHex(0x000000);
+    element.userData.index = 0;
   });
-}
-
-//Loading Main Model.
-Load('Models/scene.glb', true, 'BaseModel');
-
-//Audio
-let audioLoader = new THREE.AudioLoader();
-let audioListener = new THREE.AudioListener();
-let audio = new THREE.Audio(audioListener);
-let positionalAudio = new THREE.PositionalAudio(audioListener);
-
-//Adding Listener to camera
-camera.add(audioListener);
-
-//Normal Audio Loader Function
-function NormalAudioLoader(path, volume) {
-  audioLoader.load(path, (buffer) => {
-    audio.setBuffer(buffer);
-    audio.setVolume(volume);
-  }, undefined, undefined);
-}
-
-//Positional Audio Loader Function
-function positionalAudioLoader(path, volume, RefDistance, PosX, PosY, PosZ) {
-  audioLoader.load(path, (buffer) => {
-    positionalAudio.setBuffer(buffer);
-    positionalAudio.setVolume(volume);
-    positionalAudio.setRefDistance(RefDistance);
-    positionalAudio.setLoop(true);
-    positionalAudio.position.set(PosX, PosY, PosZ);
-    scene.add(positionalAudio);
-  }, undefined, undefined);
-}
-
-//Loading Audio
-positionalAudioLoader("Audios/BG.wav", 0.1, 10, 2, 2, 2);
-
-//Game Physics Implemetation
-let gameEventRaycast = new THREE.Raycaster();
-
-function gameEventObjIntersection() {
-  GameEventObjMatrix.extractRotation(camera.matrixWorld);
-  gameEventRaycast.ray.origin.setFromMatrixPosition(camera.matrixWorld);
-  gameEventRaycast.ray.direction.applyMatrix4(GameEventObjMatrix);
-  gameEventRaycast.far = 1;
-  let intersect = GameEventRaycast();
-  if (intersect) {
-    return intersect;
+})
+PlayButton.addEventListener('click', () => {
+  if (!alreadyPlaying) {
+    stopbool = false;
+    PlayAudio();
+    console.log('Play');
   }
-}
+})
+PauseButton.addEventListener('click', () => {
+  stopbool = true;
+  alreadyPlaying = false;
+})
 
-function GameEventRaycast() {
-  let intersectedObjects = gameEventRaycast.intersectObjects(GameEventObjects);
-  if (intersectedObjects[0]) {
-    return intersectedObjects[0];
-  }
-}
+//Function Loading all the Audios
+NormalAudioLoader();
 
-//Object Holding event functions of objects for game events
-let Properties = {
-  cube: function (intersectRef) {
-    if (!positionalAudio.isPlaying) {
-      positionalAudio.play();
-      Traverse(intersectRef.object).forEach(element => {
-        element.visible = true;
-      });
+//Function for sorting Playable object array according to index for random selection
+function Sort() {
+  for (let i = 0; i < playableObjects.length; i++) {
+    if (i - 1 > 0) {
+      if (playableObjects[i].userData['ArrayIndex'] < playableObjects[i - 1].userData['ArrayIndex']) {
+        let temp = playableObjects[i];
+        playableObjects[i] = playableObjects[i - 1];
+        playableObjects[i - 1] = temp;
+      }
+    }
+    else if (i + 1 < playableObjects.length) {
+      if (playableObjects[i].userData['ArrayIndex'] > playableObjects[i + 1].userData['ArrayIndex']) {
+        let temp = playableObjects[i];
+        playableObjects[i] = playableObjects[i + 1];
+        playableObjects[i + 1] = temp;
+      }
     }
   }
 }
 
 //UI
-function CreateInteractUIPanel(Parent) {
+function CreateInteractUIPanel() {
   const container = new ThreeMeshUI.Block({
-    height: 1.5,
-    width: 1,
+    height: 2,
+    width: 1.5,
     backgroundOpacity: 0,
     fontFamily: 'Font/AkayaTelivigala-Regular-msdf.json',
     fontTexture: 'Font/AkayaTelivigala-Regular.png'
   });
-  container.position.set(0, 0.3, 0.7)
-  container.rotation.x = -0.55;
-  Parent.add(container);
+  container.position.set(-2.5, -0.2, 3)
+  scene.add(container);
 
   const imageBlock = new ThreeMeshUI.Block({
-    height: 0.4,
-    width: 0.5,
+    height: 2,
+    width: 1.5,
     alignContent: 'center', // could be 'center' or 'left'
     justifyContent: 'center', // could be 'center' or 'start'
     padding: 0.03
@@ -341,46 +319,17 @@ function CreateInteractUIPanel(Parent) {
   imageBlock.add(text);
 }
 
-CreateInteractUIPanel(cubeMesh);
+CreateInteractUIPanel();
 
-//Setting UI to be not visible
-Traverse(cubeMesh).forEach(element => {
-  element.visible = false;
-});
-
-//Update Function.
-function Update() {
+//Update Function
+let animate = function () {
+  renderer.setAnimationLoop(animate);
   ThreeMeshUI.update();
-  if (inVR) {
-    let hit = gameEventObjIntersection();
-    if (hit) {
-      if (hit.object.userData.done == false && hit.object.name in Properties) {
-        Properties[hit.object.name](hit);
-        hit.object.userData.done = true;
-      }
-    }
-  }
-  // render the scene with our camera
   renderer.render(scene, camera);
+  if (playableObjects.length) {
+    Sort();
+  }
 }
 
-
-//Custom function created for traversing child of an object.
-function Traverse(object) {
-  let childArr = [];
-  object.traverse((child) => {
-    if (child.isBlock) {
-      childArr.push(child);
-    }
-  })
-  return childArr;
-}
-
-//Loop Function.
-const animate = function () {
-  // runs 60 times each seconds
-  renderer.setAnimationLoop(Update);
-};
-
-// start game loop
+//Have to call Update function once.
 animate();
