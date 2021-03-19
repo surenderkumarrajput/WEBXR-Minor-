@@ -141,9 +141,9 @@ window.addEventListener('click', (event) => {
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
   let intersect = Raycast();
   if (intersect) {
+    console.log(intersect.object.userData);
     intersect.object.material.color.setHex(colors[intersect.object.userData.index]);
     intersect.object.userData.index = (intersect.object.userData.index + 1) % (colors.length);
-    console.log(intersect.object.userData.index);
 
     //Don not add object in playable array if already present
     if (!playableObjects.includes(intersect.object)) {
@@ -161,19 +161,19 @@ camera.add(audioListener);
 //Mapper for mapping audio with colors.
 let mapper = {
   '0xffff00': () => {
-    setAudio(loadedAudioBuffers[1], 1)
+    setAudio(loadedAudioBuffers[0], 1)
   },
   '0x00ffff': () => {
-    setAudio(loadedAudioBuffers[2], 1)
+    setAudio(loadedAudioBuffers[1], 1)
   },
   '0xffffff': () => {
-    setAudio(loadedAudioBuffers[3], 1)
+    setAudio(loadedAudioBuffers[2], 1)
   },
   '0xff0000': () => {
-    setAudio(loadedAudioBuffers[4], 1)
+    setAudio(loadedAudioBuffers[3], 1)
   },
   '0x40ff00': () => {
-    setAudio(loadedAudioBuffers[0], 1)
+    setAudio(loadedAudioBuffers[4], 1)
   }
 }
 
@@ -225,18 +225,18 @@ function PlayAudio() {
     setTimeout(function () {
       if (playableObjects[index]) {
         if (colors[playableObjects[index].userData.index] in mapper) {
-          mapper[colors[playableObjects[index].userData.index]]();
-
-          console.log(colors[playableObjects[index].userData.index]);
+          //As colors index are returning from 1 ,code tweaking to adjust the mapping.
+          if (playableObjects[index].userData.index > 0) {
+            mapper[colors[playableObjects[index].userData.index - 1]]();
+          }
+          else {
+            mapper[colors[colors.length - 1]]();
+          }
           cube_mesh.position.set(playableObjects[index].position.x, playableObjects[index].position.y, playableObjects[index].position.z + 1);
         }
       }
+      index = (index + 1) % playableObjects.length;
       if (index < playableObjects.length) {
-        index++;
-        PlayAudio();
-      }
-      else {
-        index = 0;
         PlayAudio();
       }
     }, 200)
