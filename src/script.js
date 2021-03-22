@@ -45,7 +45,7 @@ let playableObjects = [];
 const camHolder = new Object3D();
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.01, 1000);
-const renderer = new THREE.WebGLRenderer({ alpha: true });
+const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
 
 scene.add(camHolder);
 camHolder.add(camera);
@@ -65,7 +65,8 @@ renderer.xr.enabled = true;
 //Event Triggered on VR Entered
 VrButton.addEventListener('VREntered', () => {
   //Setting Camera Position
-  camHolder.position.z = 5;
+  camHolder.position.z = 5.2;
+  camHolder.position.y = -2;
 });
 
 VrButton.addEventListener('VREnd', () => {
@@ -123,12 +124,14 @@ for (let i = 0; i < iCount; i++) {
     cube_mesh.userData = { 'index': 0, 'ArrayIndex': objectarray.indexOf(cube_mesh) };
   }
 }
+grid.position.x = 1;
 scene.add(grid);
 
 //Cube for traversing helper
 const cube_mat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
 const cube_mesh = new THREE.Mesh(cube, cube_mat);
 cube_mesh.scale.set(0.5, 0.5, 0.5);
+cube_mesh.visible = false;
 scene.add(cube_mesh);
 
 //Raycast Function
@@ -141,7 +144,6 @@ window.addEventListener('click', (event) => {
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
   let intersect = Raycast();
   if (intersect) {
-    console.log(intersect.object.userData);
     intersect.object.material.color.setHex(colors[intersect.object.userData.index]);
     intersect.object.userData.index = (intersect.object.userData.index + 1) % (colors.length);
 
@@ -221,18 +223,18 @@ const PlayButton = document.getElementById('Play');
 function PlayAudio() {
   if (!stopbool && playableObjects.length > 0) {
     alreadyPlaying = true;
-    cube_mesh.visible = true;
     setTimeout(function () {
       if (playableObjects[index]) {
         if (colors[playableObjects[index].userData.index] in mapper) {
           //As colors index are returning from 1 ,code tweaking to adjust the mapping.
           if (playableObjects[index].userData.index > 0) {
+            cube_mesh.visible = true;
             mapper[colors[playableObjects[index].userData.index - 1]]();
           }
           else {
             mapper[colors[colors.length - 1]]();
           }
-          cube_mesh.position.set(playableObjects[index].position.x, playableObjects[index].position.y, playableObjects[index].position.z + 1);
+          cube_mesh.position.set(playableObjects[index].position.x + 1, playableObjects[index].position.y, playableObjects[index].position.z + 1);
         }
       }
       index = (index + 1) % playableObjects.length;
@@ -260,7 +262,6 @@ PlayButton.addEventListener('click', () => {
   if (!alreadyPlaying) {
     stopbool = false;
     PlayAudio();
-    console.log('Play');
   }
 })
 PauseButton.addEventListener('click', () => {
@@ -317,6 +318,31 @@ function CreateInteractUIPanel() {
   });
   container.add(imageBlock);
   imageBlock.add(text);
+
+
+  //3D Text
+  const fontLoader = new THREE.FontLoader();
+  fontLoader.load('Font/helvetiker_regular.typeface.json', (ref) => {
+    const text3D = new THREE.TextGeometry('BEAT0!', {
+      font: ref,
+      weight: 'bold',
+      bevelEnabled: true,
+      height: 20,
+      size: 200,
+      hover: 30,
+
+      curveSegments: 4,
+
+      bevelThickness: 2,
+      bevelSize: 2
+    })
+    const textMat = new THREE.MeshLambertMaterial({ color: 0xffff00 });
+    const textMesh = new THREE.Mesh(text3D, textMat);
+    textMesh.position.set(-(window.innerWidth / 4), (window.innerHeight / 4) + 450, -1000);
+    textMesh.rotation.x = 0;
+    textMesh.rotation.y = Math.PI * 2;
+    scene.add(textMesh);
+  });
 }
 
 CreateInteractUIPanel();
