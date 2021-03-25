@@ -11,6 +11,9 @@ import ThreeMeshUI from './three-mesh-ui-master/src/three-mesh-ui.js';
 //Array of objects which ray can hit.
 let objectarray = [];
 
+//Empty matrix for stroing matrix of controller.
+let raycastMatrix = new THREE.Matrix4();
+
 //Array of loaded audio buffers
 let loadedAudioBuffers = [];
 
@@ -26,6 +29,7 @@ let audioRefLinks =
 
 //Color Array
 let colors = ['0xffff00', '0x00ffff', '0xffffff', '0xff0000', '0x40ff00'];
+let textMesh;//3D Text Mesh
 
 //SkyBox
 const loader = new THREE.CubeTextureLoader();
@@ -121,7 +125,7 @@ for (let i = 0; i < iCount; i++) {
     cube_mesh.position.y = (j - jCount / 2) * spacing;
     grid.add(cube_mesh);
     objectarray.push(cube_mesh);
-    cube_mesh.userData = { 'index': 0, 'ArrayIndex': objectarray.indexOf(cube_mesh) };
+    cube_mesh.userData = { 'index': 0, 'Playable': true, 'ArrayIndex': objectarray.indexOf(cube_mesh) };
   }
 }
 grid.position.x = 1;
@@ -138,18 +142,25 @@ scene.add(cube_mesh);
 let raycaster = new THREE.Raycaster();
 
 //Variable for storing position of click or tap
+let intersect;
 let mouse = new THREE.Vector2();
 window.addEventListener('click', (event) => {
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-  let intersect = Raycast();
+  raycaster.setFromCamera(mouse, camera);
+  intersect = Raycast();
   if (intersect) {
-    intersect.object.material.color.setHex(colors[intersect.object.userData.index]);
-    intersect.object.userData.index = (intersect.object.userData.index + 1) % (colors.length);
+    if (intersect.object.userData.isUI) {
+      UIMapper[intersect.object.name]();
+    }
+    else {
+      intersect.object.material.color.setHex(colors[intersect.object.userData.index]);
+      intersect.object.userData.index = (intersect.object.userData.index + 1) % (colors.length);
 
-    //Don not add object in playable array if already present
-    if (!playableObjects.includes(intersect.object)) {
-      playableObjects.push(intersect.object);
+      //Don not add object in playable array if already present
+      if (!playableObjects.includes(intersect.object)) {
+        playableObjects.push(intersect.object);
+      }
     }
   }
 })
@@ -204,34 +215,61 @@ function setAudio(Buffer, Volume) {
   }
 }
 
+function gameEventObjIntersection(controller) {
+  raycastMatrix.identity().extractRotation(controller.matrixWorld);
+
+  raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+  raycaster.ray.direction.applyMatrix4(raycastMatrix);
+
+  const intersect = Raycast();
+
+  return intersect;
+}
+
 //Raycast returning hit object
 function Raycast() {
-  raycaster.setFromCamera(mouse, camera);
-  let objectIntersected = raycaster.intersectObjects(objectarray);
-  if (objectIntersected[0]) {
-    return objectIntersected[0];
-  }
+  return objectarray.reduce((closestIntersection, obj) => {
+    const intersection = raycaster.intersectObject(obj, true);
+
+    if (!intersection[0]) return closestIntersection;
+
+    if (
+      !closestIntersection ||
+      intersection[0].distance < closestIntersection.distance
+    ) {
+      intersection[0].object = obj;
+
+      return intersection[0];
+    } else {
+      return closestIntersection;
+    }
+  }, null);
 }
 
 //Function for Traversing audios or play audios
 let index = 0;
 let stopbool = false;
-const StopButton = document.getElementById('Stop');
-const PauseButton = document.getElementById('Pause');
-const PlayButton = document.getElementById('Play');
 
 function PlayAudio() {
   if (!stopbool && playableObjects.length > 0) {
     alreadyPlaying = true;
     setTimeout(function () {
+      //Fix for index value which is getting NaN after stopping and playing audio
+      if (!index) {
+        index = 0;
+      }
       if (playableObjects[index]) {
         if (colors[playableObjects[index].userData.index] in mapper) {
           //As colors index are returning from 1 ,code tweaking to adjust the mapping.
           if (playableObjects[index].userData.index > 0) {
             cube_mesh.visible = true;
             mapper[colors[playableObjects[index].userData.index - 1]]();
+            let Color = colors[playableObjects[index].userData.index - 1];
+            textMesh.material.color.setHex(Color);
+            textMesh.material.needsUpdate = true;
           }
           else {
+            cube_mesh.visible = true;
             mapper[colors[colors.length - 1]]();
           }
           cube_mesh.position.set(playableObjects[index].position.x + 1, playableObjects[index].position.y, playableObjects[index].position.z + 1);
@@ -245,30 +283,35 @@ function PlayAudio() {
   }
 }
 
+//UI Mapper
 let alreadyPlaying = false;//If already is playing or not.
-
-StopButton.addEventListener('click', () => {
-  stopbool = true;
-  cube_mesh.visible = false;
-  alreadyPlaying = false;
-  playableObjects = [];
-  index = 0;
-  objectarray.forEach(element => {
-    element.material.color.setHex(0x000000);
-    element.userData.index = 0;
-  });
-})
-PlayButton.addEventListener('click', () => {
-  if (!alreadyPlaying) {
-    stopbool = false;
-    PlayAudio();
-  }
-})
-PauseButton.addEventListener('click', () => {
-  stopbool = true;
-  alreadyPlaying = false;
-})
-
+let UIMapper = {
+  'PLAY': () => {
+    if (!alreadyPlaying) {
+      stopbool = false;
+      PlayAudio();
+    }
+  },
+  'PAUSE': () => {
+    stopbool = true;
+    alreadyPlaying = false;
+  },
+  'STOP': () => {
+    stopbool = true;
+    alreadyPlaying = false;
+    cube_mesh.visible = false;
+    index = 0;
+    playableObjects = [];
+    textMesh.material.color.setHex(0xffffff);
+    textMesh.material.needsUpdate = true;
+    objectarray.forEach(element => {
+      if (element.userData.Playable) {
+        element.material.color.setHex(0x000000);
+        element.userData.index = 0;
+      }
+    });
+  },
+}
 //Function Loading all the Audios
 NormalAudioLoader();
 
@@ -298,10 +341,12 @@ function CreateInteractUIPanel() {
     height: 2,
     width: 1.5,
     backgroundOpacity: 0,
+    alignContent: 'center', // could be 'center' or 'left'
+    justifyContent: 'center', // could be 'center' or 'start'
     fontFamily: 'Font/AkayaTelivigala-Regular-msdf.json',
     fontTexture: 'Font/AkayaTelivigala-Regular.png'
   });
-  container.position.set(-2.5, -0.2, 3)
+  container.position.set(-2.1, -0.3, 3)
   scene.add(container);
 
   const imageBlock = new ThreeMeshUI.Block({
@@ -318,9 +363,10 @@ function CreateInteractUIPanel() {
   });
   container.add(imageBlock);
   imageBlock.add(text);
+}
 
-
-  //3D Text
+//3D Text
+function Create3DText() {
   const fontLoader = new THREE.FontLoader();
   fontLoader.load('Font/helvetiker_regular.typeface.json', (ref) => {
     const text3D = new THREE.TextGeometry('BEAT0!', {
@@ -336,8 +382,8 @@ function CreateInteractUIPanel() {
       bevelThickness: 2,
       bevelSize: 2
     })
-    const textMat = new THREE.MeshLambertMaterial({ color: 0xffff00 });
-    const textMesh = new THREE.Mesh(text3D, textMat);
+    const textMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+    textMesh = new THREE.Mesh(text3D, textMat);
     textMesh.position.set(-(window.innerWidth / 4), (window.innerHeight / 4) + 450, -1000);
     textMesh.rotation.x = 0;
     textMesh.rotation.y = Math.PI * 2;
@@ -345,13 +391,103 @@ function CreateInteractUIPanel() {
   });
 }
 
+//Function for Buttons
+function CreateButtons(Text, x, y, z, name) {
+  const container = new ThreeMeshUI.Block({
+    height: 0.3,
+    width: 0.5,
+    alignContent: 'center', // could be 'center' or 'left'
+    justifyContent: 'center', // could be 'center' or 'start'
+    backgroundOpacity: 0,
+    fontFamily: 'Font/AkayaTelivigala-Regular-msdf.json',
+    fontTexture: 'Font/AkayaTelivigala-Regular.png'
+  });
+  container.position.set(x, y, z);
+  scene.add(container);
+
+  const imageBlock = new ThreeMeshUI.Block({
+    height: 0.3,
+    width: 0.5,
+    alignContent: 'center', // could be 'center' or 'left'
+    justifyContent: 'center', // could be 'center' or 'start'
+    padding: 0.03
+  });
+  const text = new ThreeMeshUI.Text({
+    content: Text,
+    fontColor: new THREE.Color(0xffffff),
+    fontSize: 0.1
+  });
+  container.add(imageBlock);
+  imageBlock.name = name;
+  imageBlock.userData = { 'isUI': true };
+  objectarray.push(imageBlock);
+  imageBlock.add(text);
+}
+
+//Adding Controllers mesh in the scene.
+const controllerModelFactory = new XRControllerModelFactory();
+const controller1 = renderer.xr.getController(0);
+controller1.add(controllerModelFactory.createControllerModel(controller1));
+const controller2 = renderer.xr.getController(1);
+controller2.add(controllerModelFactory.createControllerModel(controller2));
+camHolder.add(controller1, controller2);
+
+controller1.addEventListener("selectstart", (event) => {
+  controllerFunction(event.target);
+});
+controller2.addEventListener("selectstart", (event) => {
+  controllerFunction(event.target);
+});
+
+//Line Mesh
+const geometry = new THREE.BufferGeometry().setFromPoints([
+  new THREE.Vector3(0, 0, 0),
+  new THREE.Vector3(0, 0, -1),
+]);
+
+const line = new THREE.Line(
+  geometry,
+  new THREE.LineBasicMaterial({ color: new THREE.Color(255, 0, 0) })
+);
+line.name = "line";
+line.scale.z = 5;
+
+
+//Adding Line to  Controller
+controller1.add(line.clone());
+controller2.add(line.clone());
+
+function controllerFunction(controller) {
+  intersect = gameEventObjIntersection(controller);
+  console.log(intersect);
+  if (intersect) {
+    if (intersect.object.userData.isUI) {
+      UIMapper[intersect.object.name]();
+    }
+    else {
+      intersect.object.material.color.setHex(colors[intersect.object.userData.index]);
+      intersect.object.userData.index = (intersect.object.userData.index + 1) % (colors.length);
+
+      //Don not add object in playable array if already present
+      if (!playableObjects.includes(intersect.object)) {
+        playableObjects.push(intersect.object);
+      }
+    }
+  }
+}
+
 CreateInteractUIPanel();
+Create3DText();
+CreateButtons('PLAY', 2, 0.4, 3, 'PLAY');
+CreateButtons('PAUSE', 2, 0, 3, 'PAUSE');
+CreateButtons('STOP', 2, -0.4, 3, 'STOP');
 
 //Update Function
 let animate = function () {
   renderer.setAnimationLoop(animate);
   ThreeMeshUI.update();
   renderer.render(scene, camera);
+
   if (playableObjects.length) {
     Sort();
   }
