@@ -1,18 +1,19 @@
 import './style.css'
 import * as THREE from "three/build/three.module.js";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import * as dat from "dat.gui";
 import { VRButton } from "./VRButton.js";
 import { XRControllerModelFactory } from "three/examples/jsm/webxr/XRControllerModelFactory.js";
 import { Object3D } from 'three';
 import ThreeMeshUI from './three-mesh-ui-master/src/three-mesh-ui.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 
 //Array of objects which ray can hit.
 let objectarray = [];
 
 //Empty matrix for stroing matrix of controller.
 let raycastMatrix = new THREE.Matrix4();
+
+//Model loader
+const modelLoader = new GLTFLoader();
 
 //Array of loaded audio buffers
 let loadedAudioBuffers = [];
@@ -29,18 +30,6 @@ let audioRefLinks =
 
 //Color Array
 let colors = ['0xffff00', '0x00ffff', '0xffffff', '0xff0000', '0x40ff00'];
-let textMesh;//3D Text Mesh
-
-//SkyBox
-const loader = new THREE.CubeTextureLoader();
-const skyBox = loader.load([
-  "/SkyBox/Right.png",  //px
-  "/SkyBox/Left.png",   //nx
-  "/SkyBox/Up.png",     //py
-  "/SkyBox/Down.png",   //ny
-  "/SkyBox/Front.png",  //pz
-  "/SkyBox/Back.png",   //nz
-]);
 
 //Array of Playable Objects
 let playableObjects = [];
@@ -53,8 +42,6 @@ const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
 
 scene.add(camHolder);
 camHolder.add(camera);
-
-scene.background = skyBox;
 
 renderer.setSize(window.innerWidth, window.innerHeight);
 
@@ -70,15 +57,17 @@ renderer.xr.enabled = true;
 VrButton.addEventListener('VREntered', () => {
   //Setting Camera Position
   camHolder.position.z = 5.2;
-  camHolder.position.y = -2;
+  camHolder.position.y = -1.5;
 });
 
 VrButton.addEventListener('VREnd', () => {
   //Setting Camera Position
+  camHolder.position.y = 0.2;
   camHolder.position.z = 5;
 });
 
 //Setting Camera Position
+camHolder.position.y = 0.2;
 camHolder.position.z = 5;
 
 //Resize Event
@@ -88,11 +77,6 @@ window.addEventListener("resize", function () {
   renderer.setSize(window.innerWidth, window.innerHeight);
   camera.updateProjectionMatrix();
 });
-
-//Orbital Controls
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 0, 0);
-controls.update();
 
 //Fog
 let color = new THREE.Color("#88DAE4");
@@ -108,31 +92,48 @@ var pointLight = new THREE.PointLight(0xffffff, 1);
 pointLight.position.set(25, 50, 25);
 scene.add(pointLight);
 
+//Inverted Sphere
+let ModelColor;
+modelLoader.load('Models/SM_InvertedSphereNew.glb', (Model) => {
+  let model = Model.scene;
+  textureLoader.load('Models/447239-637491040523739681-16x9.jpg', (texture) => {
+    let material = new THREE.MeshBasicMaterial({ map: texture })
+    ModelColor = material;
+    model.children[0].material = material;
+    scene.add(model);
+  })
+})
+
 //Grid
 const grid = new THREE.Object3D();
 
 let spacing = 1.3;
 let iCount = 4;
 let jCount = 4;
-
 const cube = new THREE.BoxGeometry();
 
-for (let i = 0; i < iCount; i++) {
-  for (let j = jCount - 1; j >= 0; j--) {
-    const cube_mat = new THREE.MeshStandardMaterial({ color: 0x000000 });
-    const cube_mesh = new THREE.Mesh(cube, cube_mat);
-    cube_mesh.position.x = (i - iCount / 2) * spacing;
-    cube_mesh.position.y = (j - jCount / 2) * spacing;
-    grid.add(cube_mesh);
-    objectarray.push(cube_mesh);
-    cube_mesh.userData = { 'index': 0, 'Playable': true, 'ArrayIndex': objectarray.indexOf(cube_mesh) };
+//Texture Loader
+const textureLoader = new THREE.TextureLoader();
+textureLoader.load('Texture/CubeTexture.jpg', (texture) => {
+  for (let i = 0; i < iCount; i++) {
+    for (let j = jCount - 1; j >= 0; j--) {
+      const cube_mat = new THREE.MeshStandardMaterial({ color: 0x000000, map: texture });
+      const cube_mesh = new THREE.Mesh(cube, cube_mat);
+      cube_mesh.position.x = (i - iCount / 2) * spacing;
+      cube_mesh.position.y = (j - jCount / 2) * spacing;
+      grid.add(cube_mesh);
+      objectarray.push(cube_mesh);
+      cube_mesh.userData = { 'index': 0, 'Playable': true, 'ArrayIndex': objectarray.indexOf(cube_mesh) };
+    }
   }
-}
-grid.position.x = 1;
-scene.add(grid);
+  grid.position.x = 0.5;
+  scene.add(grid);
+})
 
 //Cube for traversing helper
-const cube_mat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+const cube_mat = new THREE.MeshStandardMaterial({
+  color: 0xff0000
+});
 const cube_mesh = new THREE.Mesh(cube, cube_mat);
 cube_mesh.scale.set(0.5, 0.5, 0.5);
 cube_mesh.visible = false;
@@ -265,14 +266,17 @@ function PlayAudio() {
             cube_mesh.visible = true;
             mapper[colors[playableObjects[index].userData.index - 1]]();
             let Color = colors[playableObjects[index].userData.index - 1];
-            textMesh.material.color.setHex(Color);
-            textMesh.material.needsUpdate = true;
+            ModelColor.color.setHex(Color);
+            ModelColor.needsUpdate = true;
           }
           else {
             cube_mesh.visible = true;
             mapper[colors[colors.length - 1]]();
+            let Color = colors[colors.length - 1];
+            ModelColor.color.setHex(Color);
+            ModelColor.needsUpdate = true;
           }
-          cube_mesh.position.set(playableObjects[index].position.x + 1, playableObjects[index].position.y, playableObjects[index].position.z + 1);
+          cube_mesh.position.set(playableObjects[index].position.x + 0.5, playableObjects[index].position.y, playableObjects[index].position.z + 1);
         }
       }
       index = (index + 1) % playableObjects.length;
@@ -302,8 +306,8 @@ let UIMapper = {
     cube_mesh.visible = false;
     index = 0;
     playableObjects = [];
-    textMesh.material.color.setHex(0xffffff);
-    textMesh.material.needsUpdate = true;
+    ModelColor.color.setHex(0xffffff);  //Setting Iverted Sphere Color back to normal on stop
+    ModelColor.needsUpdate = true;
     objectarray.forEach(element => {
       if (element.userData.Playable) {
         element.material.color.setHex(0x000000);
@@ -311,7 +315,12 @@ let UIMapper = {
       }
     });
   },
+  'VISUALISE': () => {
+    let active = visualiserMesh.visible;
+    visualiserMesh.visible = !active;
+  }
 }
+
 //Function Loading all the Audios
 NormalAudioLoader();
 
@@ -346,49 +355,39 @@ function CreateInteractUIPanel() {
     fontFamily: 'Font/AkayaTelivigala-Regular-msdf.json',
     fontTexture: 'Font/AkayaTelivigala-Regular.png'
   });
-  container.position.set(-2.1, -0.3, 3)
+  container.position.set(-2.8, -0.3, 3)
   scene.add(container);
 
   const imageBlock = new ThreeMeshUI.Block({
-    height: 2,
+    height: 2.5,
     width: 1.5,
     alignContent: 'center', // could be 'center' or 'left'
     justifyContent: 'center', // could be 'center' or 'start'
     padding: 0.03
   });
-  const text = new ThreeMeshUI.Text({
-    content: 'Press Select to Interact',
-    fontColor: new THREE.Color(0xffffff),
-    fontSize: 0.1
-  });
   container.add(imageBlock);
-  imageBlock.add(text);
+  textureLoader.load('Texture/Instructions.png', (texture) => {
+    imageBlock.backgroundTexture = texture;
+  })
 }
 
-//3D Text
-function Create3DText() {
-  const fontLoader = new THREE.FontLoader();
-  fontLoader.load('Font/helvetiker_regular.typeface.json', (ref) => {
-    const text3D = new THREE.TextGeometry('BEAT0!', {
-      font: ref,
-      weight: 'bold',
-      bevelEnabled: true,
-      height: 20,
-      size: 200,
-      hover: 30,
-
-      curveSegments: 4,
-
-      bevelThickness: 2,
-      bevelSize: 2
-    })
-    const textMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
-    textMesh = new THREE.Mesh(text3D, textMat);
-    textMesh.position.set(-(window.innerWidth / 4), (window.innerHeight / 4) + 450, -1000);
-    textMesh.rotation.x = 0;
-    textMesh.rotation.y = Math.PI * 2;
-    scene.add(textMesh);
+//Heading Text
+function CreateHeading() {
+  const container = new ThreeMeshUI.Block({
+    height: 1.2,
+    width: 2.2,
+    // backgroundOpacity: 0,
+    alignContent: 'center', // could be 'center' or 'left'
+    justifyContent: 'center', // could be 'center' or 'start'
+    fontFamily: 'Font/AkayaTelivigala-Regular-msdf.json',
+    fontTexture: 'Font/AkayaTelivigala-Regular.png'
   });
+  container.position.set(0, 1.56, 3)
+  scene.add(container);
+
+  textureLoader.load('Texture/Logo.png', (texture) => {
+    container.backgroundTexture = texture;
+  })
 }
 
 //Function for Buttons
@@ -452,7 +451,6 @@ const line = new THREE.Line(
 line.name = "line";
 line.scale.z = 5;
 
-
 //Adding Line to  Controller
 controller1.add(line.clone());
 controller2.add(line.clone());
@@ -476,11 +474,12 @@ function controllerFunction(controller) {
   }
 }
 
+CreateHeading();
 CreateInteractUIPanel();
-Create3DText();
 CreateButtons('PLAY', 2, 0.4, 3, 'PLAY');
 CreateButtons('PAUSE', 2, 0, 3, 'PAUSE');
 CreateButtons('STOP', 2, -0.4, 3, 'STOP');
+CreateButtons('VISUALISE', 2, -0.8, 3, 'VISUALISE');
 
 //Update Function
 let animate = function () {
@@ -491,7 +490,35 @@ let animate = function () {
   if (playableObjects.length) {
     Sort();
   }
+  analyser.getFrequencyData();
+
+  uniforms.tAudioData.value.needsUpdate = true;
 }
+
+//#region Audio Analyser
+let analyser, uniforms;
+const fftSize = 128;
+
+analyser = new THREE.AudioAnalyser(audio, fftSize);
+
+const format = (renderer.capabilities.isWebGL2) ? THREE.RedFormat : THREE.LuminanceFormat;
+
+uniforms = {
+  tAudioData: { value: new THREE.DataTexture(analyser.data, fftSize / 2, 1, format) },
+};
+
+const shaderMat = new THREE.ShaderMaterial({
+  uniforms: uniforms,
+  vertexShader: document.getElementById('vertexShader').textContent,
+  fragmentShader: document.getElementById('fragmentShader').textContent,
+});
+
+const geo = new THREE.PlaneGeometry(0.6, 1);
+
+const visualiserMesh = new THREE.Mesh(geo, shaderMat);
+scene.add(visualiserMesh);
+visualiserMesh.visible = false;
+//#endregion
 
 //Have to call Update function once.
 animate();
