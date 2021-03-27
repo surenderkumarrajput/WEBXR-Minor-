@@ -114,6 +114,8 @@ const cube = new THREE.BoxGeometry();
 
 //Texture Loader
 const textureLoader = new THREE.TextureLoader();
+const loadingButton = document.getElementById('buttonload');
+
 textureLoader.load('Texture/CubeTexture.jpg', (texture) => {
   for (let i = 0; i < iCount; i++) {
     for (let j = jCount - 1; j >= 0; j--) {
@@ -128,6 +130,10 @@ textureLoader.load('Texture/CubeTexture.jpg', (texture) => {
   }
   grid.position.x = 0.5;
   scene.add(grid);
+  loadingButton.style.visibility = 'hidden';
+
+}, () => {
+  loadingButton.style.visibility = 'visible';
 })
 
 //Cube for traversing helper
