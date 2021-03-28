@@ -50,15 +50,16 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 //Add to HTML Page.
 document.body.appendChild(renderer.domElement);
 
+const preloader = document.querySelector('.preloader');
+
+
+
 //Creating VR Button.
 let VrButton;
 let vrControl;
 
 //#region Loading Manager
-const percent = document.getElementById('percent');
 manager.onProgress = function (item, loaded, total) {
-  loadingButton.style.visibility = 'visible';
-  percent.textContent = parseInt((loaded / total * 100)) + '%'
 };
 manager.onLoad = onLoadComplete;
 //#endregion
@@ -68,7 +69,6 @@ let isAlreadyPressed = false;
 function onLoadComplete() {
   document.body.appendChild(VrButton = VRButton.createButton(renderer));
   renderer.xr.enabled = true;
-  loadingButton.style.visibility = 'hidden';
 
   vrControl = VRControl(renderer, camera, scene);
   camHolder.add(vrControl.controllerGrips[0], vrControl.controllers[0]);
@@ -92,6 +92,17 @@ function onLoadComplete() {
     isSelected = false;
     isAlreadyPressed = false;
   });
+  const fadeEffect = setInterval(() => {
+    if (!preloader.style.opacity) {
+      preloader.style.opacity = 1;
+    }
+    if (preloader.style.opacity > 0) {
+      preloader.style.opacity -= 0.03;
+    } else {
+      clearInterval(fadeEffect);
+      preloader.style.zindex = 0;
+    }
+  }, 100);
 }
 
 //Setting Camera Position
@@ -142,7 +153,6 @@ const cube = new THREE.BoxGeometry();
 
 //Texture Loader
 const textureLoader = new THREE.TextureLoader(manager);
-const loadingButton = document.getElementById('buttonload');
 
 textureLoader.load('Texture/CubeTexture.jpg', (texture) => {
   for (let i = 0; i < iCount; i++) {
