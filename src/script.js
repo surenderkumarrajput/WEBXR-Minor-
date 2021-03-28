@@ -1,10 +1,10 @@
 import './style.css'
 import * as THREE from "three/build/three.module.js";
 import { VRButton } from "./VRButton.js";
-import { XRControllerModelFactory } from "three/examples/jsm/webxr/XRControllerModelFactory.js";
 import { Object3D } from 'three';
 import ThreeMeshUI from './three-mesh-ui-master/src/three-mesh-ui.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+import VRControl from "./three-mesh-ui-master/examples/utils/VRControl.js";
 
 //Array of objects which ray can hit.
 let objectarray = [];
@@ -52,6 +52,7 @@ document.body.appendChild(renderer.domElement);
 
 //Creating VR Button.
 let VrButton;
+let vrControl;
 
 //#region Loading Manager
 const percent = document.getElementById('percent');
@@ -62,22 +63,34 @@ manager.onProgress = function (item, loaded, total) {
 manager.onLoad = onLoadComplete;
 //#endregion
 
+let isSelected = false;
+let isAlreadyPressed = false;
 function onLoadComplete() {
   document.body.appendChild(VrButton = VRButton.createButton(renderer));
   renderer.xr.enabled = true;
   loadingButton.style.visibility = 'hidden';
 
+  vrControl = VRControl(renderer, camera, scene);
+  camHolder.add(vrControl.controllerGrips[0], vrControl.controllers[0]);
+
   //Event Triggered on VR Entered
   VrButton.addEventListener('VREntered', () => {
     //Setting Camera Position
-    camHolder.position.z = 5.2;
+    camHolder.position.z = 5;
     camHolder.position.y = -1.5;
   });
 
   VrButton.addEventListener('VREnd', () => {
     //Setting Camera Position
-    camHolder.position.y = 0.2;
-    camHolder.position.z = 5;
+    camera.rotation.set(0, 0, 0);
+
+  });
+  vrControl.controllers[0].addEventListener("selectstart", () => {
+    isSelected = true;
+  });
+  vrControl.controllers[0].addEventListener("selectend", (event) => {
+    isSelected = false;
+    isAlreadyPressed = false;
   });
 }
 
@@ -441,57 +454,6 @@ function CreateButtons(Text, x, y, z, name) {
   imageBlock.add(text);
 }
 
-//Adding Controllers mesh in the scene.
-const controllerModelFactory = new XRControllerModelFactory();
-const controller1 = renderer.xr.getController(0);
-controller1.add(controllerModelFactory.createControllerModel(controller1));
-const controller2 = renderer.xr.getController(1);
-controller2.add(controllerModelFactory.createControllerModel(controller2));
-camHolder.add(controller1, controller2);
-
-controller1.addEventListener("selectstart", (event) => {
-  controllerFunction(event.target);
-});
-controller2.addEventListener("selectstart", (event) => {
-  controllerFunction(event.target);
-});
-
-//Line Mesh
-const geometry = new THREE.BufferGeometry().setFromPoints([
-  new THREE.Vector3(0, 0, 0),
-  new THREE.Vector3(0, 0, -1),
-]);
-
-const line = new THREE.Line(
-  geometry,
-  new THREE.LineBasicMaterial({ color: new THREE.Color(255, 0, 0) })
-);
-line.name = "line";
-line.scale.z = 5;
-
-//Adding Line to  Controller
-controller1.add(line.clone());
-controller2.add(line.clone());
-
-function controllerFunction(controller) {
-  intersect = gameEventObjIntersection(controller);
-  console.log(intersect);
-  if (intersect) {
-    if (intersect.object.userData.isUI) {
-      UIMapper[intersect.object.name]();
-    }
-    else {
-      intersect.object.material.color.setHex(colors[intersect.object.userData.index]);
-      intersect.object.userData.index = (intersect.object.userData.index + 1) % (colors.length);
-
-      //Don not add object in playable array if already present
-      if (!playableObjects.includes(intersect.object)) {
-        playableObjects.push(intersect.object);
-      }
-    }
-  }
-}
-
 CreateHeading();
 CreateInteractUIPanel();
 CreateButtons('PLAY', 2, 0.4, 3, 'PLAY');
@@ -511,6 +473,30 @@ let animate = function () {
   analyser.getFrequencyData();
 
   uniforms.tAudioData.value.needsUpdate = true;
+
+  if (renderer.xr.isPresenting) {
+    vrControl.setFromController(0, raycaster.ray);
+    intersect = gameEventObjIntersection(vrControl.controllers[0]);
+    // Position the little white dot at the end of the controller pointing ray
+    if (intersect) {
+      vrControl.setPointerAt(0, intersect.point);
+      if (isSelected && !isAlreadyPressed) {
+        isAlreadyPressed = true
+        if (intersect.object.userData.isUI) {
+          UIMapper[intersect.object.name]();
+        }
+        else {
+          intersect.object.material.color.setHex(colors[intersect.object.userData.index]);
+          intersect.object.userData.index = (intersect.object.userData.index + 1) % (colors.length);
+
+          //Don not add object in playable array if already present
+          if (!playableObjects.includes(intersect.object)) {
+            playableObjects.push(intersect.object);
+          }
+        }
+      }
+    }
+  }
 }
 
 //#region Audio Analyser
