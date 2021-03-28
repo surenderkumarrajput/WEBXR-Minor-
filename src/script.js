@@ -9,11 +9,13 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 //Array of objects which ray can hit.
 let objectarray = [];
 
+let manager = new THREE.LoadingManager();
+
 //Empty matrix for stroing matrix of controller.
 let raycastMatrix = new THREE.Matrix4();
 
 //Model loader
-const modelLoader = new GLTFLoader();
+const modelLoader = new GLTFLoader(manager);
 
 //Array of loaded audio buffers
 let loadedAudioBuffers = [];
@@ -50,21 +52,34 @@ document.body.appendChild(renderer.domElement);
 
 //Creating VR Button.
 let VrButton;
-document.body.appendChild(VrButton = VRButton.createButton(renderer));
-renderer.xr.enabled = true;
 
-//Event Triggered on VR Entered
-VrButton.addEventListener('VREntered', () => {
-  //Setting Camera Position
-  camHolder.position.z = 5.2;
-  camHolder.position.y = -1.5;
-});
+//#region Loading Manager
+const percent = document.getElementById('percent');
+manager.onProgress = function (item, loaded, total) {
+  loadingButton.style.visibility = 'visible';
+  percent.textContent = parseInt((loaded / total * 100)) + '%'
+};
+manager.onLoad = onLoadComplete;
+//#endregion
 
-VrButton.addEventListener('VREnd', () => {
-  //Setting Camera Position
-  camHolder.position.y = 0.2;
-  camHolder.position.z = 5;
-});
+function onLoadComplete() {
+  document.body.appendChild(VrButton = VRButton.createButton(renderer));
+  renderer.xr.enabled = true;
+  loadingButton.style.visibility = 'hidden';
+
+  //Event Triggered on VR Entered
+  VrButton.addEventListener('VREntered', () => {
+    //Setting Camera Position
+    camHolder.position.z = 5.2;
+    camHolder.position.y = -1.5;
+  });
+
+  VrButton.addEventListener('VREnd', () => {
+    //Setting Camera Position
+    camHolder.position.y = 0.2;
+    camHolder.position.z = 5;
+  });
+}
 
 //Setting Camera Position
 camHolder.position.y = 0.2;
@@ -113,7 +128,7 @@ let jCount = 4;
 const cube = new THREE.BoxGeometry();
 
 //Texture Loader
-const textureLoader = new THREE.TextureLoader();
+const textureLoader = new THREE.TextureLoader(manager);
 const loadingButton = document.getElementById('buttonload');
 
 textureLoader.load('Texture/CubeTexture.jpg', (texture) => {
@@ -130,10 +145,7 @@ textureLoader.load('Texture/CubeTexture.jpg', (texture) => {
   }
   grid.position.x = 0.5;
   scene.add(grid);
-  loadingButton.style.visibility = 'hidden';
 
-}, () => {
-  loadingButton.style.visibility = 'visible';
 })
 
 //Cube for traversing helper
@@ -175,7 +187,7 @@ window.addEventListener('click', (event) => {
 //Audio
 let audioListener = new THREE.AudioListener();
 let audio = new THREE.Audio(audioListener);
-let audioLoader = new THREE.AudioLoader();
+let audioLoader = new THREE.AudioLoader(manager);
 camera.add(audioListener);
 
 //Mapper for mapping audio with colors.
@@ -528,3 +540,4 @@ visualiserMesh.visible = false;
 
 //Have to call Update function once.
 animate();
+
