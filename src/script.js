@@ -172,13 +172,24 @@ textureLoader.load('Texture/CubeTexture.jpg', (texture) => {
 })
 
 //Cube for traversing helper
-const cube_mat = new THREE.MeshStandardMaterial({
-  color: 0xff0000
-});
-const cube_mesh = new THREE.Mesh(cube, cube_mat);
-cube_mesh.scale.set(0.5, 0.5, 0.5);
-cube_mesh.visible = false;
-scene.add(cube_mesh);
+let cube_mesh;
+
+const texturePaths = ['Texture/Play.png', 'Texture/Pause.png'];
+let textures = [];
+for (let index = 0; index < texturePaths.length; index++) {
+  textureLoader.load(texturePaths[index], (texture) => {
+    textures.push(texture);
+    const cube_mat = new THREE.MeshStandardMaterial({
+      map: textures[1],
+      color: 0x00ff00,
+    });
+    cube_mesh = new THREE.Mesh(cube, cube_mat);
+    cube_mesh.scale.set(0.5, 0.5, 0.1);
+    cube_mesh.visible = false;
+    scene.add(cube_mesh);
+  });
+}
+
 
 //Raycast Function
 let raycaster = new THREE.Raycaster();
@@ -295,6 +306,9 @@ let stopbool = false;
 function PlayAudio() {
   if (!stopbool && playableObjects.length > 0) {
     alreadyPlaying = true;
+    cube_mesh.material.map = textures[1];
+    cube_mesh.material.color.setHex(0x00ff00);
+
     setTimeout(function () {
       //Fix for index value which is getting NaN after stopping and playing audio
       if (!index) {
@@ -340,6 +354,8 @@ let UIMapper = {
   'PAUSE': () => {
     stopbool = true;
     alreadyPlaying = false;
+    cube_mesh.material.map = textures[0];
+    cube_mesh.material.color.setHex(0xff0000);
   },
   'STOP': () => {
     stopbool = true;
