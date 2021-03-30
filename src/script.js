@@ -9,7 +9,11 @@ import VRControl from "./three-mesh-ui-master/examples/utils/VRControl.js";
 //Array of objects which ray can hit.
 let objectarray = [];
 
+//Loading Manager
 let manager = new THREE.LoadingManager();
+
+//Boolean for can Raycast
+let canRaycast = false;
 
 //Empty matrix for stroing matrix of controller.
 let raycastMatrix = new THREE.Matrix4();
@@ -52,8 +56,6 @@ document.body.appendChild(renderer.domElement);
 
 const preloader = document.querySelector('.preloader');
 
-
-
 //Creating VR Button.
 let VrButton;
 let vrControl;
@@ -66,25 +68,46 @@ manager.onLoad = onLoadComplete;
 
 let isSelected = false;
 let isAlreadyPressed = false;
+
+//Function called when Loading is completed.
 function onLoadComplete() {
-  document.body.appendChild(VrButton = VRButton.createButton(renderer));
+  setTimeout(() => {
+    const fadeEffect = setInterval(() => {
+      if (!preloader.style.opacity) {
+        preloader.style.opacity = 1;
+      }
+      if (preloader.style.opacity > 0) {
+        preloader.style.opacity -= 0.125;
+      } else {
+        canRaycast = true;
+
+        //#region Adding VR Button after Loding screen ended
+        document.body.appendChild(VrButton = VRButton.createButton(renderer));
+        //Event Triggered on VR Entered
+        VrButton.addEventListener('VREntered', () => {
+          //Setting Camera Position
+          camHolder.position.z = 5;
+          camHolder.position.y = -1.5;
+        });
+
+        VrButton.addEventListener('VREnd', () => {
+          //Setting Camera Position
+          camera.rotation.set(0, 0, 0);
+
+        });
+        //#endregion
+
+        clearInterval(fadeEffect);
+      }
+    }, 100);
+  }, 3000);
+
+
   renderer.xr.enabled = true;
 
   vrControl = VRControl(renderer, camera, scene);
   camHolder.add(vrControl.controllerGrips[0], vrControl.controllers[0]);
 
-  //Event Triggered on VR Entered
-  VrButton.addEventListener('VREntered', () => {
-    //Setting Camera Position
-    camHolder.position.z = 5;
-    camHolder.position.y = -1.5;
-  });
-
-  VrButton.addEventListener('VREnd', () => {
-    //Setting Camera Position
-    camera.rotation.set(0, 0, 0);
-
-  });
   vrControl.controllers[0].addEventListener("selectstart", () => {
     isSelected = true;
   });
@@ -92,17 +115,6 @@ function onLoadComplete() {
     isSelected = false;
     isAlreadyPressed = false;
   });
-  const fadeEffect = setInterval(() => {
-    if (!preloader.style.opacity) {
-      preloader.style.opacity = 1;
-    }
-    if (preloader.style.opacity > 0) {
-      preloader.style.opacity -= 0.03;
-    } else {
-      clearInterval(fadeEffect);
-      preloader.style.zindex = 0;
-    }
-  }, 100);
 }
 
 //Setting Camera Position
@@ -184,7 +196,7 @@ for (let index = 0; index < texturePaths.length; index++) {
       color: 0x00ff00,
     });
     cube_mesh = new THREE.Mesh(cube, cube_mat);
-    cube_mesh.scale.set(0.5, 0.5, 0.1);
+    cube_mesh.scale.set(0.5, 0.5, 0.01);
     cube_mesh.visible = false;
     scene.add(cube_mesh);
   });
@@ -202,7 +214,7 @@ window.addEventListener('click', (event) => {
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
   intersect = Raycast();
-  if (intersect) {
+  if (intersect && canRaycast) {
     if (intersect.object.userData.isUI) {
       UIMapper[intersect.object.name]();
     }
@@ -331,7 +343,7 @@ function PlayAudio() {
             ModelColor.color.setHex(Color);
             ModelColor.needsUpdate = true;
           }
-          cube_mesh.position.set(playableObjects[index].position.x + 0.5, playableObjects[index].position.y, playableObjects[index].position.z + 1);
+          cube_mesh.position.set(playableObjects[index].position.x + 0.5, playableObjects[index].position.y, playableObjects[index].position.z + 0.5);
         }
       }
       index = (index + 1) % playableObjects.length;
@@ -462,7 +474,7 @@ function CreateButtons(Text, x, y, z, name) {
   scene.add(container);
 
   const imageBlock = new ThreeMeshUI.Block({
-    height: 0.3,
+    height: 0.25,
     width: 0.5,
     alignContent: 'center', // could be 'center' or 'left'
     justifyContent: 'center', // could be 'center' or 'start'
@@ -504,7 +516,7 @@ let animate = function () {
     vrControl.setFromController(0, raycaster.ray);
     intersect = gameEventObjIntersection(vrControl.controllers[0]);
     // Position the little white dot at the end of the controller pointing ray
-    if (intersect) {
+    if (intersect && canRaycast) {
       vrControl.setPointerAt(0, intersect.point);
       if (isSelected && !isAlreadyPressed) {
         isAlreadyPressed = true
